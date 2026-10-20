@@ -9,7 +9,7 @@ Plain static HTML, CSS and one image: no build step. Open `index.html` in a brow
 - `index.html` — home and the map of the site
 - `stories.html`, `storyangel.html`, `storyfactor.html` — stories
 - `conclusions.html` — conclusions of the treatise
-- `ideology.html`, `principles.html`, `rules.html` — ideology
+- `ideology.html`, `principles.html`, `treatise.html`, `rules.html` — ideology
 - `plans.html` — plans
 - `technologies.html`, `techsales.html`, `techbot.html` — technologies
 - `community.html` — community
