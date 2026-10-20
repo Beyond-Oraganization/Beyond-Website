@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beyondia — Beyond Bot</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Jost:wght@300;400;500&display=swap">
+<link rel="stylesheet" href="beyondia.css">
+<style>body{margin:0;background:#0B0B0C}</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="sec hdr">
+  <div class="wrap" style="max-width: 1400px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 32px">
+    <a href="index.html" class="brand" aria-label="Beyondia — home">
+      <svg viewBox="36 36 328 328" width="44" height="44" aria-hidden="true" style="display: block; flex: 0 0 44px">
+        <g transform="translate(200 200)" fill="#1B1B1A">
+          <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z"></path>
+          <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(45)"></path>
+          <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(90)"></path>
+          <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(135)"></path>
+          <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(180)"></path>
+          <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(225)"></path>
+          <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(270)"></path>
+          <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(315)"></path>
+        </g>
+        <g transform="translate(200 200) scale(1.25)" fill="none" stroke="#1B1B1A" stroke-width="3.5" stroke-linecap="round">
+          <path d="M-21 0Q0 -17 21 0Q0 17 -21 0Z"></path>
+          <circle r="7.5"></circle>
+          <circle r="3.2" fill="#1B1B1A"></circle>
+        </g>
+      </svg>
+      <span>BEYONDIA</span>
+    </a>
+    <nav aria-label="Main navigation">
+      <ul class="nav">
+        <li><a href="stories.html" class="">STORIES</a></li><li><a href="conclusions.html" class="">CONCLUSIONS</a></li><li><a href="ideology.html" class="">IDEOLOGY</a></li><li><a href="plans.html" class="">PLANS</a></li><li><a href="technologies.html" class="on">TECHNOLOGIES</a></li><li><a href="community.html" class="">COMMUNITY</a></li><li><a href="creator.html" class="">CREATOR</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+  <section class="sec alt" aria-labelledby="page-title">
+    <div class="rl" aria-hidden="true"></div><div class="rt" aria-hidden="true"></div>
+    <svg class="rn" viewBox="-12 -7 24 14" width="24" height="14" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M-11 0Q0 -9 11 0Q0 9 -11 0Z"></path><circle r="3.4"></circle><circle r="1.3" fill="currentColor"></circle></g></svg>
+
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <a href="index.html">Home</a><span class="sep">/</span><a href="technologies.html">Technologies</a><span class="sep">/</span><span class="here">Beyond Bot</span>
+      </nav>
+
+      <div class="sec-head">
+        <p class="kicker">Technology</p>
+        <h1 id="page-title" class="h1">Beyond Bot</h1>
+        <p class="lead" style="max-width: 26em; margin-top: 32px">A .NET console application that automates trading on Bybit.</p>
+      </div>
+
+      <div class="g2">
+        <div>
+          <svg viewBox="0 0 240 240" width="200" height="200" role="img" aria-label="A single candlestick with an eye in its body" style="display: block; margin-bottom: 32px">
+            <path d="M120 56V84M120 156V184" fill="none" stroke="#1B1B1A" stroke-width="10" stroke-linecap="round"></path>
+            <rect x="82" y="84" width="76" height="72" rx="12" fill="#1B1B1A"></rect>
+            <path d="M93 120Q120 96 147 120Q120 144 93 120Z" fill="none" stroke="#D3D3CD" stroke-width="5" stroke-linejoin="round"></path>
+            <circle cx="120" cy="120" r="8" fill="#D3D3CD"></circle>
+          </svg>
+          <ul class="pills" style="margin-bottom: 24px"><li class="pill">.NET</li><li class="pill">Bybit</li><li class="pill">Trading</li></ul>
+          <a href="#" class="more">GitHub · [repository link]
+            <svg width="28" height="12" viewBox="0 0 28 12" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M0 6H26M21 1L26 6L21 11"></path></svg>
+          </a>
+        </div>
+        <div>
+          <p class="label" style="margin-bottom: 24px; color: var(--mute)">What it does</p>
+          <ul class="checks">
+            <li>Connects to Bybit through a dedicated controller layer and works with market and trading endpoints.</li>
+            <li>Manages symbols, timeframes, market data, indicators and orders from a console menu.</li>
+            <li>Runs automated strategies, which are separate modules that can be swapped or changed without rewriting the app.</li>
+            <li>Calculates the EMA, RMA, ATR and Adaptive Envelope indicators, caching the values for repeated evaluations.</li>
+            <li>Stores bot data in MySQL.</li>
+            <li>Publishes as a self-contained Linux build and runs continuously as a service.</li>
+          </ul>
+          <p class="small mute" style="margin-top: 24px">Best suited to developers and technical traders who want a customisable, code-first foundation rather than a no-code panel.</p>
+        </div>
+      </div>
+
+      <div class="pager">
+        <a href="techsales.html">
+          <span class="label">Previous</span>
+          <h3>Beyond Sales</h3>
+        </a>
+        <a href="technologies.html" class="next">
+          <span class="label">Back</span>
+          <h3>All technologies</h3>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <footer class="sec dark" style="padding-top: 0; padding-bottom: 40px">
+  <div class="wrap" style="padding-top: 40px; border-top: 4px solid var(--line2)">
+    <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px 48px">
+      <a href="index.html" class="brand" aria-label="Beyondia — home">
+        <svg viewBox="36 36 328 328" width="48" height="48" aria-hidden="true" style="display: block; flex: 0 0 48px">
+          <g transform="translate(200 200)" fill="#D9D9D3">
+            <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z"></path>
+            <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(45)"></path>
+            <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(90)"></path>
+            <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(135)"></path>
+            <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(180)"></path>
+            <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(225)"></path>
+            <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(270)"></path>
+            <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(315)"></path>
+          </g>
+          <g transform="translate(200 200) scale(1.25)" fill="none" stroke="#D9D9D3" stroke-width="3.5" stroke-linecap="round">
+            <path d="M-21 0Q0 -17 21 0Q0 17 -21 0Z"></path>
+            <circle r="7.5"></circle>
+            <circle r="3.2" fill="#D9D9D3"></circle>
+          </g>
+        </svg>
+        <span>BEYONDIA</span>
+      </a>
+      <nav aria-label="Footer navigation">
+        <ul class="nav">
+          <li><a href="stories.html">STORIES</a></li>
+          <li><a href="conclusions.html">CONCLUSIONS</a></li>
+          <li><a href="ideology.html">IDEOLOGY</a></li>
+          <li><a href="plans.html">PLANS</a></li>
+          <li><a href="technologies.html">TECHNOLOGIES</a></li>
+          <li><a href="community.html">COMMUNITY</a></li>
+          <li><a href="creator.html">CREATOR</a></li>
+        </ul>
+      </nav>
+    </div>
+    <p class="label" style="margin-top: 32px; color: var(--mute)">© Beyondia · Created by Roman Patlai</p>
+  </div>
+</footer>
+
+</div>
+</body>
+</html>
