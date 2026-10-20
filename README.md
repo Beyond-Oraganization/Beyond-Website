@@ -7,7 +7,7 @@ Plain static HTML, CSS and one image: no build step. Open `index.html` in a brow
 ## Pages
 
 - `index.html` — home and the map of the site
-- `stories.html`, `storyangel.html`, `storyfactor.html` — stories
+- `stories.html` and the `story*.html` pages — stories
 - `conclusions.html` — conclusions of the treatise
 - `ideology.html`, `principles.html`, `treatise.html`, `rules.html` — ideology
 - `plans.html` — plans
