@@ -225,16 +225,16 @@
         "items": [
           {
             "id": "nearest-plan",
-            "title": "Nearest plan",
-            "text": "Tomorrow: a new edit.",
-            "status": "Tomorrow",
+            "title": "Nearest weeks",
+            "text": "Refining the website from slack and making it usable",
+            "status": "In progress",
             "visible": true
           },
           {
             "id": "video-edit-release",
-            "title": "Release of the video edit",
-            "text": "Publishing the finished video edit.",
-            "status": "Planned",
+            "title": "Nearest month",
+            "text": "Creating more and more content.",
+            "status": "In planning",
             "visible": true
           }
         ]
@@ -246,16 +246,8 @@
       "intro": "Near steps are dated; far ones are only a direction.",
       "steps": [
         {
-          "id": "new-edit",
-          "when": "Tomorrow",
-          "title": "A new edit",
-          "text": "The next video edit is made.",
-          "status": "Next",
-          "visible": true
-        },
-        {
           "id": "release-edit",
-          "when": "After the edit",
+          "when": "Today",
           "title": "Release of the video edit",
           "text": "The finished video edit is published.",
           "status": "Planned",
