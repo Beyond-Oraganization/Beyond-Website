@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beyondia manager</title>
+<style>
+:root {
+  --bg: #C8C8C2; --panel: #D3D3CD; --ink: #1B1B1A; --mute: #55554F; --line: #1B1B1A;
+  --ok: #1F5A2E; --bad: #8A1F1F; --warn: #7A5A00;
+  --f-d: "Archivo Black", "Arial Black", Impact, sans-serif;
+  --f-t: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --f-r: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+html { color-scheme: light; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-r); }
+button, input, select, textarea { font: inherit; color: inherit; }
+.top { background: var(--ink); color: #D9D9D3; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding: 14px 20px; border-bottom: 4px solid var(--ink); }
+.top h1 { font: 20px/1 var(--f-d); letter-spacing: .04em; margin: 0; text-transform: uppercase; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.chip { font: 12px/1 var(--f-t); text-transform: uppercase; letter-spacing: .06em; padding: 6px 8px; border: 2px solid #D9D9D3; }
+.chip.ok { background: #D9D9D3; color: var(--ok); } .chip.bad { background: var(--bad); border-color: var(--bad); color: #fff; } .chip.warn { background: #E5C65A; border-color: #E5C65A; color: var(--ink); }
+.layout { display: grid; grid-template-columns: minmax(360px, 560px) 1fr; gap: 0; min-height: calc(100vh - 60px); }
+@media (max-width: 980px) { .layout { grid-template-columns: 1fr; } .preview { min-height: 70vh; border-left: 0 !important; border-top: 4px solid var(--ink); } }
+.editor { padding: 20px; min-width: 0; }
+.tabs { display: flex; flex-wrap: wrap; gap: 0; margin-bottom: 20px; border: 4px solid var(--ink); }
+.tabs button { flex: 1; border: 0; border-right: 4px solid var(--ink); background: var(--panel); padding: 10px 8px; font: 13px/1 var(--f-t); text-transform: uppercase; letter-spacing: .06em; cursor: pointer; }
+.tabs button:last-child { border-right: 0; }
+.tabs button[aria-selected="true"] { background: var(--ink); color: #D9D9D3; }
+.tabs button:focus-visible, .btn:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid #2B5BD7; outline-offset: 2px; }
+h2 { font: 22px/1.1 var(--f-d); text-transform: uppercase; margin: 0 0 6px; }
+h3 { font: 13px/1 var(--f-t); text-transform: uppercase; letter-spacing: .08em; margin: 28px 0 10px; padding-top: 14px; border-top: 4px solid var(--ink); }
+.hint { color: var(--mute); font-size: 13px; margin: 0 0 14px; }
+.card { background: var(--panel); border: 4px solid var(--ink); padding: 12px 14px; margin-bottom: 10px; }
+.card.hidden { opacity: .62; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.row .grow { flex: 1; min-width: 0; }
+.name { font: 600 15px/1.25 var(--f-r); overflow-wrap: anywhere; }
+.meta { font: 12px/1.4 var(--f-t); color: var(--mute); overflow-wrap: anywhere; }
+.badge { font: 11px/1 var(--f-t); text-transform: uppercase; padding: 3px 5px; border: 2px solid var(--ink); margin-left: 6px; }
+.btn { border: 3px solid var(--ink); background: var(--bg); padding: 6px 10px; font: 12px/1.1 var(--f-t); text-transform: uppercase; letter-spacing: .05em; cursor: pointer; }
+.btn:hover:not(:disabled) { background: var(--ink); color: #D9D9D3; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.primary { background: var(--ink); color: #D9D9D3; } .btn.primary:hover:not(:disabled) { background: #3A3A37; }
+.btn.danger { border-color: var(--bad); color: var(--bad); } .btn.danger:hover:not(:disabled) { background: var(--bad); color: #fff; }
+label { display: block; font: 12px/1.2 var(--f-t); text-transform: uppercase; letter-spacing: .06em; margin: 12px 0 4px; }
+input[type=text], textarea, select { width: 100%; background: #E4E4DE; border: 3px solid var(--ink); padding: 8px 10px; border-radius: 0; }
+textarea { min-height: 76px; resize: vertical; }
+.count { font: 11px/1 var(--f-t); color: var(--mute); float: right; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+details.add { border: 4px solid var(--ink); background: var(--panel); margin-top: 12px; }
+details.add > summary { cursor: pointer; padding: 10px 14px; font: 13px/1 var(--f-t); text-transform: uppercase; letter-spacing: .06em; }
+details.add > div { padding: 0 14px 14px; }
+.preview { border-left: 4px solid var(--ink); background: #1B1B1A; display: flex; flex-direction: column; min-width: 0; }
+.pbar { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: var(--ink); }
+.pbar .btn { background: transparent; color: #D9D9D3; border-color: #D9D9D3; } .pbar .btn[aria-pressed="true"] { background: #D9D9D3; color: var(--ink); }
+.pframe { flex: 1; display: flex; justify-content: center; background: #3A3A37; padding: 0; overflow: auto; }
+.pframe iframe { border: 0; background: #fff; width: 100%; height: 100%; min-height: 600px; }
+.pframe.phone iframe { width: 390px; max-width: 100%; border-left: 4px solid #1B1B1A; border-right: 4px solid #1B1B1A; }
+ul.plain { margin: 6px 0 0; padding: 0; list-style: none; } ul.plain li { margin: 2px 0; overflow-wrap: anywhere; }
+pre { background: var(--ink); color: #D9D9D3; padding: 12px; overflow: auto; font: 12px/1.5 var(--f-t); margin: 10px 0 0; white-space: pre-wrap; }
+.ok-t { color: var(--ok); } .bad-t { color: var(--bad); } .warn-t { color: var(--warn); }
+#toast { position: fixed; left: 20px; right: 20px; bottom: 20px; max-width: 640px; margin: 0 auto; z-index: 10; }
+#toast div { border: 4px solid var(--ink); padding: 12px 14px; background: var(--panel); font: 13px/1.4 var(--f-t); white-space: pre-wrap; display: flex; gap: 12px; align-items: flex-start; box-shadow: 6px 6px 0 var(--ink); }
+#toast div.err { background: #F1D5D5; border-color: var(--bad); }
+#toast button { margin-left: auto; }
+@media (prefers-reduced-motion: no-preference) { .card, .btn { transition: background-color .12s, color .12s, opacity .12s; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Beyondia manager</h1>
+  <div class="chips" id="chips" aria-live="polite"></div>
+</header>
+<div class="layout">
+  <main class="editor">
+    <div class="tabs" role="tablist" aria-label="Sections" id="tabs"></div>
+    <div id="panel" role="tabpanel"></div>
+  </main>
+  <aside class="preview" aria-label="Live preview">
+    <div class="pbar" id="pbar"></div>
+    <div class="pframe" id="pframe"><iframe id="frame" title="Site preview" src="/preview/index.html"></iframe></div>
+  </aside>
+</div>
+<datalist id="statuses"></datalist>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+const TOKEN = "__BM_TOKEN__";
+const TABS = [["home", "Home"], ["doors", "Doors"], ["plans", "Plans"], ["github", "GitHub"], ["publish", "Publish"]];
+const PAGE_OF_TAB = { home: "index.html", doors: "index.html", plans: "plans.html", github: "github.html" };   // the preview follows the tab
+const STATUSES = ["Live", "In progress", "Planned", "Next", "Tomorrow", "Open", "Done", "Paused"];
+const ui = { tab: "home", editing: new Set(), confirming: null, publish: null, busy: false, previewPage: "index.html", phone: false, message: "" };
+let state = null;
+
+/* ---------- tiny DOM helper: text nodes only, never raw markup ---------- */
+function h(tag, props, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v === false || v == null) continue;
+    if (k === "class") el.className = v;
+    else if (k === "text") el.textContent = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (v === true) el.setAttribute(k, "");
+    else el.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  return el;
+}
+
+/* ---------- talking to the server ---------- */
+async function post(path, body) {
+  const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", "X-BM-Token": TOKEN }, body: JSON.stringify(body || {}) });
+  const data = await res.json().catch(() => ({ ok: false, error: "The server sent an unreadable answer." }));
+  if (!data.ok) throw new Error(data.error || "Request failed.");
+  return data;
+}
+async function load() {
+  const res = await fetch("/api/state");
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error);
+  state = data;
+}
+async function run(work, success) {
+  if (ui.busy) return;
+  ui.busy = true;
+  try {
+    const data = await work();
+    if (data && data.config !== undefined) state = data;
+    ui.busy = false;
+    render();
+    reloadPreview();
+    if (success) toast(success);
+    return data;
+  } catch (e) {
+    ui.busy = false;
+    render();
+    toast(e.message, true);
+  }
+}
+const edit = (op, params, success) => run(() => post("/api/edit", { op, params }), success);
+
+/* ---------- toast ---------- */
+function toast(text, isError) {
+  const box = document.getElementById("toast");
+  box.replaceChildren();
+  const note = h("div", { class: isError ? "err" : "" }, h("span", { text }), h("button", { class: "btn", onclick: () => box.replaceChildren(), "aria-label": "Dismiss message", text: "OK" }));
+  box.append(note);
+  if (!isError) setTimeout(() => { if (note.parentNode === box) box.replaceChildren(); }, 3500);
+}
+
+/* ---------- form fields ---------- */
+let uid = 0;
+function field(label, value, opts = {}) {
+  const id = "f" + (++uid);
+  const input = opts.area ? h("textarea", { id, maxlength: opts.max, placeholder: opts.placeholder }) : h("input", { id, type: "text", maxlength: opts.max, placeholder: opts.placeholder });
+  input.value = value == null ? "" : value;
+  if (opts.list) input.setAttribute("list", "statuses");
+  const count = opts.max ? h("span", { class: "count" }) : null;
+  const upd = () => { if (count) count.textContent = input.value.length + "/" + opts.max; };
+  input.addEventListener("input", upd); upd();
+  const wrap = h("div", {}, h("label", { for: id }, label, count), input, opts.hint ? h("p", { class: "hint", text: opts.hint, style: "margin:4px 0 0" }) : null);
+  return { el: wrap, input, get: () => input.value, reset: () => { input.value = ""; upd(); } };
+}
+const changedOnly = (fields, original) => {
+  const out = {};
+  for (const [k, f] of Object.entries(fields)) if (f.get() !== (original[k] == null ? "" : original[k])) out[k] = f.get();
+  return out;
+};
+
+/* ---------- status chips and preview ---------- */
+function renderChips() {
+  const chips = document.getElementById("chips");
+  chips.replaceChildren();
+  const s = state.status;
+  const add = (text, kind) => chips.append(h("span", { class: "chip " + kind, text }));
+  add(s.valid ? "Config valid" : "Config invalid", s.valid ? "ok" : "bad");
+  if (s.valid) {
+    add(s.stale.length ? "Pages out of date" : "Pages built", s.stale.length ? "warn" : "ok");
+    add(s.site_problems.length ? s.site_problems.length + " site problem(s)" : "Site checks pass", s.site_problems.length ? "bad" : "ok");
+    if (!s.git) add("Not a git repo", "warn");
+    else add(s.git.changed.length ? s.git.changed.length + " unpublished" : "Published", s.git.changed.length ? "warn" : "ok");
+  }
+}
+function renderPreviewBar() {
+  const bar = document.getElementById("pbar");
+  bar.replaceChildren();
+  for (const [file, label] of [["index.html", "Home"], ["plans.html", "Plans"], ["github.html", "GitHub"]])
+    bar.append(h("button", { class: "btn", "aria-pressed": String(ui.previewPage === file), onclick: () => { ui.previewPage = file; renderPreviewBar(); reloadPreview(true); }, text: label }));
+  bar.append(h("button", { class: "btn", "aria-pressed": String(ui.phone), onclick: () => { ui.phone = !ui.phone; document.getElementById("pframe").classList.toggle("phone", ui.phone); renderPreviewBar(); }, text: "Phone width" }));
+  bar.append(h("button", { class: "btn", onclick: () => reloadPreview(true), text: "Reload" }));
+}
+function reloadPreview() {
+  document.getElementById("frame").src = "/preview/" + ui.previewPage + "?t=" + Date.now();
+}
+
+/* ---------- Home tab ---------- */
+function renderHome() {
+  const home = state.config.home;
+  const fields = {
+    kicker: field("Kicker", home.kicker, { max: 40 }),
+    title: field("Title", home.title, { max: 40 }),
+    lead: field("Lead", home.lead, { max: 240, area: true }),
+    map_kicker: field("Map kicker", home.map.kicker, { max: 40 }),
+    map_title: field("Map title", home.map.title, { max: 80, hint: "{count} becomes the number of visible doors, in words." }),
+    map_intro: field("Map intro", home.map.intro, { max: 240, area: true }),
+  };
+  const original = { kicker: home.kicker, title: home.title, lead: home.lead, map_kicker: home.map.kicker, map_title: home.map.title, map_intro: home.map.intro };
+  const save = h("button", { class: "btn primary", onclick: () => {
+    const changed = changedOnly(fields, original);
+    if (!Object.keys(changed).length) return toast("Nothing changed.");
+    edit("home.set", changed, "Home page saved.");
+  }, text: "Save home page" });
+
+  const buttons = home.buttons.map((b, i) => h("div", { class: "card" }, h("div", { class: "row" },
+    h("div", { class: "grow" }, h("div", { class: "name" }, b.label, h("span", { class: "badge", text: b.style })), h("div", { class: "meta", text: b.href })),
+    h("button", { class: "btn danger", disabled: home.buttons.length <= 1, onclick: () => edit("button.remove", { position: i + 1 }, "Button removed."), text: "Remove" }))));
+  const bl = field("Label", "", { max: 40 }), bh = field("Link", "", { placeholder: "ideology.html or https://…" });
+  const bs = h("select", { id: "bstyle" }, h("option", { value: "ghost", text: "ghost (outlined)" }), h("option", { value: "solid", text: "solid (filled)" }));
+  const addButton = h("details", { class: "add" }, h("summary", { text: "+ Add a button" }), h("div", {}, bl.el, bh.el, h("label", { for: "bstyle", text: "Style" }), bs,
+    h("div", { class: "actions" }, h("button", { class: "btn primary", disabled: home.buttons.length >= 3, onclick: () => edit("button.add", { label: bl.get(), href: bh.get(), style: bs.value }, "Button added."), text: "Add button" })),
+    home.buttons.length >= 3 ? h("p", { class: "hint", text: "At most 3 buttons." }) : null));
+
+  const ticker = home.ticker.map((t, i) => h("div", { class: "card" }, h("div", { class: "row" },
+    h("div", { class: "grow name", text: t }),
+    h("button", { class: "btn danger", disabled: home.ticker.length <= 1, onclick: () => edit("ticker.remove", { position: i + 1 }, "Phrase removed."), text: "Remove" }))));
+  const tt = field("Phrase", "", { max: 60 });
+  const addTicker = h("details", { class: "add" }, h("summary", { text: "+ Add a phrase" }), h("div", {}, tt.el,
+    h("div", { class: "actions" }, h("button", { class: "btn primary", disabled: home.ticker.length >= 12, onclick: () => edit("ticker.add", { text: tt.get() }, "Phrase added."), text: "Add phrase" }))));
+
+  return [
+    h("h2", { text: "Home page" }), h("p", { class: "hint", text: "The headline block and the map heading. Changes rebuild the page at once." }),
+    ...Object.values(fields).map(f => f.el), h("div", { class: "actions" }, save),
+    h("h3", { text: "Buttons (1–3)" }), ...buttons, addButton,
+    h("h3", { text: "Moving strip (1–12)" }), ...ticker, addTicker,
+  ];
+}
+
+/* ---------- generic list of movable, hideable, editable items ---------- */
+function itemList({ items, kind, summary, editFields, ops, extra }) {
+  return items.map((item, i) => {
+    const key = kind + ":" + item.id;
+    const editing = ui.editing.has(key);
+    const card = h("div", { class: "card" + (item.visible ? "" : " hidden") });
+    card.append(h("div", { class: "row" },
+      h("div", { class: "grow" }, h("div", { class: "name" }, summary(item).title, item.visible ? null : h("span", { class: "badge", text: "hidden" })), h("div", { class: "meta", text: summary(item).meta })),
+      h("button", { class: "btn", disabled: i === 0, "aria-label": "Move up", onclick: () => edit(ops.move, { [ops.idKey]: item.id, position: i }), text: "↑" }),
+      h("button", { class: "btn", disabled: i === items.length - 1, "aria-label": "Move down", onclick: () => edit(ops.move, { [ops.idKey]: item.id, position: i + 2 }), text: "↓" }),
+      h("button", { class: "btn", onclick: () => edit(ops.visible, { [ops.idKey]: item.id, visible: !item.visible }, item.visible ? "Hidden." : "Visible again."), text: item.visible ? "Hide" : "Show" }),
+      h("button", { class: "btn", "aria-expanded": String(editing), onclick: () => { editing ? ui.editing.delete(key) : ui.editing.add(key); render(); }, text: editing ? "Close" : "Edit" }),
+      ui.confirming === key
+        ? h("button", { class: "btn danger", onclick: () => { ui.confirming = null; edit(ops.remove, { [ops.idKey]: item.id }, "Removed."); }, text: "Really remove?" })
+        : h("button", { class: "btn danger", onclick: () => { ui.confirming = key; render(); }, text: "Remove" })));
+    if (editing) {
+      const fields = editFields(item);
+      const original = {};
+      for (const [k, f] of Object.entries(fields)) original[k] = f.original;
+      card.append(...Object.values(fields).map(f => f.el), ...(extra ? extra(item) : []), h("div", { class: "actions" },
+        h("button", { class: "btn primary", onclick: () => {
+          const changed = changedOnly(fields, original);
+          if (!Object.keys(changed).length) return toast("Nothing changed.");
+          if (changed.stack !== undefined) changed.stack = changed.stack.split(",").map(s => s.trim()).filter(Boolean);
+          edit(ops.update, { [ops.idKey]: item.id, ...changed }, "Saved.");
+        }, text: "Save" })));
+    }
+    return card;
+  });
+}
+const withOriginal = (f, original) => { f.original = original == null ? "" : original; return f; };
+
+/* ---------- Doors tab ---------- */
+function renderDoors() {
+  const tiles = state.config.home.map.tiles;
+  const list = itemList({
+    items: tiles, kind: "tile",
+    summary: t => ({ title: (tiles.indexOf(t) + 1) + ". " + t.title, meta: t.id + "  →  " + t.href }),
+    editFields: t => ({
+      label: withOriginal(field("Label", t.label, { max: 40 }), t.label),
+      title: withOriginal(field("Title", t.title, { max: 80 }), t.title),
+      text: withOriginal(field("Text", t.text, { max: 240, area: true }), t.text),
+      kids: withOriginal(field("Rooms line (optional)", t.kids, { max: 120 }), t.kids),
+      href: withOriginal(field("Link", t.href, { placeholder: "page.html" }), t.href),
+    }),
+    ops: { move: "tile.move", visible: "tile.visible", remove: "tile.remove", update: "tile.update", idKey: "tile_id" },
+  });
+  const f = {
+    id: field("Id (a-z, 0-9, hyphens)", "", { max: 40, placeholder: "blog" }), label: field("Label", "", { max: 40 }), title: field("Title", "", { max: 80 }),
+    text: field("Text", "", { max: 240, area: true }), kids: field("Rooms line (optional)", "", { max: 120 }), href: field("Link", "", { placeholder: "stories.html" }),
+  };
+  const add = h("details", { class: "add" }, h("summary", { text: "+ Add a door" }), h("div", {}, ...Object.values(f).map(x => x.el),
+    h("div", { class: "actions" }, h("button", { class: "btn primary", onclick: () => edit("tile.add", Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.get()])), "Door added."), text: "Add door" }))));
+  const visible = tiles.filter(t => t.visible).length;
+  return [h("h2", { text: "Doors" }), h("p", { class: "hint", text: visible + " visible of " + tiles.length + ". The home page says “" + state.config.home.map.title.replace("{count}", String(visible)) + "”. Order here is the order on the page." }), ...list, add];
+}
+
+
+/* ---------- Plans tab ---------- */
+function renderPlans() {
+  const plans = state.config.plans, road = plans.roadmap;
+  const fields = {
+    title: field("Page title", plans.title, { max: 80 }), lead: field("Lead", plans.lead, { max: 240, area: true }),
+    roadmap_kicker: field("Roadmap kicker", road.kicker, { max: 40 }), roadmap_title: field("Roadmap title", road.title, { max: 80 }),
+    roadmap_intro: field("Roadmap intro", road.intro, { max: 240, area: true }),
+  };
+  const original = { title: plans.title, lead: plans.lead, roadmap_kicker: road.kicker, roadmap_title: road.title, roadmap_intro: road.intro };
+  const save = h("button", { class: "btn primary", onclick: () => {
+    const changed = changedOnly(fields, original);
+    if (!Object.keys(changed).length) return toast("Nothing changed.");
+    edit("plans.set", changed, "Plans page saved.");
+  }, text: "Save page text" });
+
+  const out = [h("h2", { text: "Plans page" }), h("p", { class: "hint", text: "Three lanes of plans, and below them the roadmap: what comes next, in order." }),
+    ...Object.values(fields).map(f => f.el), h("div", { class: "actions" }, save)];
+
+  /* lanes */
+  out.push(h("h3", { text: "Lanes (1–3)" }));
+  plans.lanes.forEach((lane, li) => {
+    const lkey = "lane:" + lane.id;
+    const editing = ui.editing.has(lkey);
+    const head = h("div", { class: "card", style: "background: var(--ink); color: #D9D9D3; border-color: var(--ink)" }, h("div", { class: "row" },
+      h("div", { class: "grow" }, h("div", { class: "name" }, lane.label), h("div", { class: "meta", style: "color:#B5B5AE", text: lane.id + " · " + lane.items.length + " plan(s)" })),
+      h("button", { class: "btn", disabled: li === 0, "aria-label": "Move lane left", onclick: () => edit("lane.move", { lane_id: lane.id, position: li }), text: "←" }),
+      h("button", { class: "btn", disabled: li === plans.lanes.length - 1, "aria-label": "Move lane right", onclick: () => edit("lane.move", { lane_id: lane.id, position: li + 2 }), text: "→" }),
+      h("button", { class: "btn", onclick: () => { editing ? ui.editing.delete(lkey) : ui.editing.add(lkey); render(); }, text: editing ? "Close" : "Rename" }),
+      ui.confirming === lkey
+        ? h("button", { class: "btn danger", onclick: () => { ui.confirming = null; edit("lane.remove", { lane_id: lane.id }, "Lane removed."); }, text: "Really remove?" })
+        : h("button", { class: "btn danger", disabled: plans.lanes.length <= 1, onclick: () => { ui.confirming = lkey; render(); }, text: "Remove" })));
+    if (editing) {
+      const lf = field("Lane label", lane.label, { max: 40 });
+      head.append(lf.el, h("div", { class: "actions" }, h("button", { class: "btn", onclick: () => lf.get() === lane.label ? toast("Nothing changed.") : edit("lane.update", { lane_id: lane.id, label: lf.get() }, "Lane renamed."), text: "Save" })));
+    }
+    if (lane.items.length && ui.confirming === lkey) head.append(h("p", { class: "hint", style: "color:#E5C65A;margin:8px 0 0", text: "A lane with plans cannot be removed. Move or remove its plans first." }));
+    out.push(head);
+
+    out.push(...itemList({
+      items: lane.items, kind: "plan",
+      summary: p => ({ title: p.title, meta: p.id + "  ·  " + p.status }),
+      editFields: p => ({
+        title: withOriginal(field("Title", p.title, { max: 80 }), p.title),
+        text: withOriginal(field("Text", p.text, { max: 240, area: true }), p.text),
+        status: withOriginal(field("Status", p.status, { max: 24, list: true }), p.status),
+      }),
+      extra: p => {
+        const sel = h("select", { id: "lane-" + p.id, "aria-label": "Move to lane" }, ...plans.lanes.map(l => h("option", { value: l.id, selected: l.id === lane.id, text: l.label })));
+        sel.addEventListener("change", () => edit("plan.relane", { plan_id: p.id, lane_id: sel.value }, "Moved to another lane."));
+        return [h("label", { for: "lane-" + p.id, text: "Move to lane" }), sel];
+      },
+      ops: { move: "plan.move", visible: "plan.visible", remove: "plan.remove", update: "plan.update", idKey: "plan_id" },
+    }));
+    if (!lane.items.length) out.push(h("p", { class: "hint", text: "No plans in this lane yet." }));
+
+    const f = { id: field("Id (a-z, 0-9, hyphens)", "", { max: 40, placeholder: "new-plan" }), title: field("Title", "", { max: 80 }), text: field("Text", "", { max: 240, area: true }), status: field("Status", "In progress", { max: 24, list: true }) };
+    out.push(h("details", { class: "add" }, h("summary", { text: "+ Add a plan to " + lane.label }), h("div", {}, ...Object.values(f).map(x => x.el),
+      h("div", { class: "actions" }, h("button", { class: "btn primary", onclick: () => edit("plan.add", { lane_id: lane.id, ...Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.get()])) }, "Plan added."), text: "Add plan" })))));
+  });
+  const lid = field("Id (a-z, 0-9, hyphens)", "", { max: 40, placeholder: "ideas" }), llabel = field("Label", "", { max: 40 });
+  out.push(h("details", { class: "add" }, h("summary", { text: "+ Add a lane" }), h("div", {}, lid.el, llabel.el,
+    h("div", { class: "actions" }, h("button", { class: "btn primary", disabled: plans.lanes.length >= 3, onclick: () => edit("lane.add", { id: lid.get(), label: llabel.get() }, "Lane added."), text: "Add lane" })),
+    plans.lanes.length >= 3 ? h("p", { class: "hint", text: "At most 3 lanes: the page lays them out in three columns." }) : null)));
+
+  /* roadmap */
+  out.push(h("h3", { text: "Roadmap steps" }));
+  const steps = itemList({
+    items: road.steps, kind: "step",
+    summary: st => ({ title: (road.steps.indexOf(st) + 1) + ". " + st.when + ": " + st.title, meta: st.id + "  ·  " + st.status }),
+    editFields: st => ({
+      when: withOriginal(field("When", st.when, { max: 30, placeholder: "Tomorrow, Autumn, 2027…" }), st.when),
+      title: withOriginal(field("Title", st.title, { max: 80 }), st.title),
+      text: withOriginal(field("Text", st.text, { max: 240, area: true }), st.text),
+      status: withOriginal(field("Status", st.status, { max: 24, list: true }), st.status),
+    }),
+    ops: { move: "step.move", visible: "step.visible", remove: "step.remove", update: "step.update", idKey: "step_id" },
+  });
+  out.push(...(steps.length ? steps : [h("p", { class: "hint", text: "No steps yet." })]));
+  const sf = { id: field("Id (a-z, 0-9, hyphens)", "", { max: 40, placeholder: "next-step" }), when: field("When", "", { max: 30, placeholder: "Tomorrow, Autumn, 2027…" }), title: field("Title", "", { max: 80 }), text: field("Text", "", { max: 240, area: true }), status: field("Status", "Planned", { max: 24, list: true }) };
+  out.push(h("details", { class: "add" }, h("summary", { text: "+ Add a roadmap step" }), h("div", {}, ...Object.values(sf).map(x => x.el),
+    h("div", { class: "actions" }, h("button", { class: "btn primary", onclick: () => edit("step.add", Object.fromEntries(Object.entries(sf).map(([k, v]) => [k, v.get()])), "Step added."), text: "Add step" })))));
+  return out;
+}
+
+/* ---------- GitHub tab ---------- */
+function renderGithub() {
+  const gh = state.config.github;
+  const fields = { title: field("Page title", gh.title, { max: 80 }), lead: field("Lead", gh.lead, { max: 240, area: true }) };
+  const original = { title: gh.title, lead: gh.lead };
+  const save = h("button", { class: "btn primary", onclick: () => {
+    const changed = changedOnly(fields, original);
+    if (!Object.keys(changed).length) return toast("Nothing changed.");
+    edit("github.set", changed, "GitHub page saved.");
+  }, text: "Save page text" });
+
+  const repos = gh.repos;
+  const list = itemList({
+    items: repos, kind: "repo",
+    summary: r => ({ title: r.name, meta: r.url + (r.stack.length ? "  ·  " + r.stack.join(", ") : "") }),
+    editFields: r => ({
+      name: withOriginal(field("Name", r.name, { max: 60 }), r.name),
+      url: withOriginal(field("GitHub link", r.url, { placeholder: "https://github.com/…" }), r.url),
+      description: withOriginal(field("Description", r.description, { max: 240, area: true }), r.description),
+      stack: withOriginal(field("Stack (comma separated)", r.stack.join(", "), { hint: "e.g. Python, MySQL" }), r.stack.join(", ")),
+      page: withOriginal(field("Details page of this site (optional)", r.page || "", { placeholder: "techbot.html" }), r.page || ""),
+    }),
+    ops: { move: "repo.move", visible: "repo.visible", remove: "repo.remove", update: "repo.update", idKey: "repo_id" },
+  });
+  const f = {
+    id: field("Id (a-z, 0-9, hyphens)", "", { max: 40, placeholder: "beyond-docs" }), name: field("Name", "", { max: 60 }),
+    url: field("GitHub link", "", { placeholder: "https://github.com/Beyond-Oraganization/…" }), description: field("Description", "", { max: 240, area: true }),
+    stack: field("Stack (comma separated)", ""), page: field("Details page of this site (optional)", "", { placeholder: "techbot.html" }),
+  };
+  const add = h("details", { class: "add" }, h("summary", { text: "+ Add a repository" }), h("div", {}, ...Object.values(f).map(x => x.el),
+    h("div", { class: "actions" }, h("button", { class: "btn primary", onclick: () => {
+      const p = { id: f.id.get(), name: f.name.get(), url: f.url.get(), description: f.description.get(), stack: f.stack.get().split(",").map(s => s.trim()).filter(Boolean) };
+      if (f.page.get().trim()) p.page = f.page.get().trim();
+      edit("repo.add", p, "Repository added.");
+    }, text: "Add repository" }))));
+  return [h("h2", { text: "GitHub page" }), h("p", { class: "hint", text: "Repositories of the organization " + state.config.site.org_url.replace("https://", "") + "." }),
+    ...Object.values(fields).map(x => x.el), h("div", { class: "actions" }, save),
+    h("h3", { text: "Repositories" }), ...(list.length ? list : [h("p", { class: "hint", text: "No repositories yet." })]), add];
+}
+
+/* ---------- Publish tab ---------- */
+function renderPublish() {
+  const s = state.status, out = [h("h2", { text: "Publish" }), h("p", { class: "hint", text: "Commits only site.config.json, index.html and github.html, then pushes to GitHub. Nothing is ever forced." })];
+  const line = (ok, text) => h("li", { class: ok ? "ok-t" : "bad-t", text: (ok ? "✓ " : "✗ ") + text });
+  const items = [line(s.valid, s.valid ? "Config is valid" : "Config is invalid")];
+  if (!s.valid) { out.push(h("ul", { class: "plain" }, items), h("pre", { text: s.problems.join("\n") })); return out; }
+  items.push(line(!s.stale.length, s.stale.length ? "Pages out of date: " + s.stale.join(", ") : "Pages match the config"));
+  items.push(line(!s.site_problems.length, s.site_problems.length ? "Site checks found " + s.site_problems.length + " problem(s)" : "Site checks pass (links, anchors, navigation, fonts)"));
+  if (!s.git) items.push(h("li", { class: "warn-t", text: "! This folder is not a Git repository, so it cannot be published." }));
+  else {
+    items.push(line(s.git.origin, s.git.origin ? "Remote 'origin' is set" : "No remote named 'origin'"));
+    items.push(line(!!s.git.branch, s.git.branch ? "On branch " + s.git.branch : "Not on a branch (detached HEAD)"));
+    items.push(h("li", { text: s.git.changed.length ? "Unpublished: " + s.git.changed.join(", ") : "Nothing unpublished" }));
+  }
+  out.push(h("ul", { class: "plain" }, items));
+  if (s.site_problems.length) out.push(h("pre", { text: s.site_problems.join("\n") }));
+  if (s.stale.length) out.push(h("div", { class: "actions" }, h("button", { class: "btn", onclick: () => run(() => post("/api/build"), "Pages rebuilt."), text: "Rebuild pages" })));
+
+  const ready = s.git && s.git.origin && s.git.branch && !s.site_problems.length;
+  const msg = field("Commit message", ui.message, { max: 100, placeholder: "Describe the change" });
+  msg.input.addEventListener("input", () => { ui.message = msg.get(); ui.confirming = null; });
+  const doPublish = (dry) => run(async () => { const d = await post("/api/publish", { message: msg.get() || "(dry run)", dry_run: dry }); ui.publish = d.publish; return d; });
+  out.push(h("h3", { text: "Send to GitHub" }), msg.el, h("div", { class: "actions" },
+    h("button", { class: "btn", disabled: !ready, onclick: () => doPublish(true), text: "Preview (changes nothing)" }),
+    ui.confirming === "publish"
+      ? h("button", { class: "btn danger", onclick: () => { ui.confirming = null; if (!msg.get().trim()) return toast("Write a commit message first.", true); doPublish(false).then(() => { if (ui.publish && ui.publish.status === "published") toast("Published " + ui.publish.commit + " to origin/" + ui.publish.branch + "."); }); }, text: "Yes, publish now" })
+      : h("button", { class: "btn primary", disabled: !ready, onclick: () => { ui.confirming = "publish"; render(); }, text: "Publish" })));
+  if (ui.publish) {
+    const p = ui.publish;
+    const text = p.status === "dry-run" ? "Preview. Nothing was changed. Would run:\n  " + p.commands.join("\n  ")
+      : p.status === "nothing" ? "Nothing to publish."
+      : "Published " + p.commit + " to origin/" + p.branch + ": " + (p.files.join(", ") || "earlier local commits");
+    out.push(h("pre", { text: (p.pages.length ? "Pages rebuilt: " + p.pages.join(", ") + "\n" : "") + text }));
+  }
+  return out;
+}
+
+/* ---------- main render ---------- */
+function render() {
+  const tabs = document.getElementById("tabs");
+  tabs.replaceChildren(...TABS.map(([id, label]) => h("button", { role: "tab", id: "tab-" + id, "aria-selected": String(ui.tab === id), onclick: () => { ui.tab = id; ui.confirming = null; const page = PAGE_OF_TAB[id]; if (page && page !== ui.previewPage) { ui.previewPage = page; renderPreviewBar(); reloadPreview(); } render(); }, text: label })));
+  const panel = document.getElementById("panel");
+  panel.replaceChildren();
+  panel.setAttribute("aria-labelledby", "tab-" + ui.tab);
+  renderChips();
+  if (!state.config) {   // invalid config: only the publish tab explains why
+    panel.append(h("h2", { text: "The config cannot be read" }), h("p", { class: "hint", text: "Fix site.config.json, then reload this page. Each problem is listed with its location." }), h("pre", { text: state.status.problems.join("\n") }));
+    return;
+  }
+  const view = { home: renderHome, doors: renderDoors, plans: renderPlans, github: renderGithub, publish: renderPublish }[ui.tab];
+  panel.append(...view());
+}
+
+(async function start() {
+  renderPreviewBar();
+  document.getElementById("statuses").append(...STATUSES.map(v => h("option", { value: v })));
+  try { await load(); render(); }
+  catch (e) { document.getElementById("panel").append(h("h2", { text: "Cannot reach the manager" }), h("p", { text: e.message })); }
+})();
+</script>
+</body>
+</html>

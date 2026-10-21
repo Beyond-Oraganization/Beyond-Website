@@ -1,0 +1,264 @@
+{
+  "schema": 1,
+  "site": {
+    "name": "Beyondia",
+    "org_url": "https://github.com/Beyond-Oraganization",
+    "repo_url": "https://github.com/Beyond-Oraganization/Beyond-Website"
+  },
+  "home": {
+    "kicker": "A country of ideas",
+    "title": "Beyondia",
+    "lead": "An idea that holds that people are made close by the ideas they live by.",
+    "buttons": [
+      {
+        "label": "Enter the ideology",
+        "href": "ideology.html",
+        "style": "solid"
+      },
+      {
+        "label": "Meet the community",
+        "href": "community.html",
+        "style": "ghost"
+      }
+    ],
+    "ticker": [
+      "Constant expansion",
+      "The right to plain speech",
+      "A long horizon",
+      "Knowledge in use"
+    ],
+    "map": {
+      "kicker": "The map",
+      "title": "{count} doors into Beyondia.",
+      "intro": "Each door opens its own part of the country, and most parts have rooms of their own.",
+      "tiles": [
+        {
+          "id": "stories",
+          "label": "Stories",
+          "title": "Myths that carry the ideas",
+          "text": "Seven stories so far, and more still to come.",
+          "kids": "Rooms: seven stories and verses",
+          "href": "stories.html",
+          "visible": true
+        },
+        {
+          "id": "conclusions",
+          "label": "Conclusions",
+          "title": "What the treatise has concluded",
+          "text": "Six conclusions from a text that is written slowly, over many years.",
+          "kids": "",
+          "href": "conclusions.html",
+          "visible": true
+        },
+        {
+          "id": "ideology",
+          "label": "Ideology",
+          "title": "How people are close",
+          "text": "The idea, the rule of three points, the principles and the rules.",
+          "kids": "Rooms: Principles · The treatise · The rules",
+          "href": "ideology.html",
+          "visible": true
+        },
+        {
+          "id": "plans",
+          "label": "Plans",
+          "title": "Built slowly, judged long",
+          "text": "What is being written, what is being built, and the horizon.",
+          "kids": "",
+          "href": "plans.html",
+          "visible": true
+        },
+        {
+          "id": "technologies",
+          "label": "Technologies",
+          "title": "Tools Beyondia already has",
+          "text": "Beyond Sales and Beyond Bot, with their code on GitHub.",
+          "kids": "Rooms: Beyond Sales · Beyond Bot",
+          "href": "technologies.html",
+          "visible": true
+        },
+        {
+          "id": "github",
+          "label": "GitHub",
+          "title": "The code, in the open",
+          "text": "Every repository of the Beyondia organization, in one place.",
+          "kids": "",
+          "href": "github.html",
+          "visible": true
+        },
+        {
+          "id": "community",
+          "label": "Community",
+          "title": "People who live by the idea",
+          "text": "The channels where the ideas are discussed.",
+          "kids": "",
+          "href": "community.html",
+          "visible": true
+        },
+        {
+          "id": "creator",
+          "label": "Creator",
+          "title": "Created by Roman Patlai",
+          "text": "Who built the idea, and how to reach Roman.",
+          "kids": "",
+          "href": "creator.html",
+          "visible": true
+        }
+      ]
+    }
+  },
+  "github": {
+    "title": "The code, in the open.",
+    "lead": "Beyondia keeps its tools in a public GitHub organization. Every repository is listed here with what it is for.",
+    "repos": [
+      {
+        "id": "beyond-sales",
+        "name": "Beyond-Sales",
+        "url": "https://github.com/Beyond-Oraganization/Beyond-Sales",
+        "description": "A local business-to-business outreach platform: a mail queue, a company-website scraper, automated sending with safety limits, and tracking of replies and leads, with AI-assisted drafting.",
+        "stack": [
+          "Python",
+          "MySQL",
+          "AI"
+        ],
+        "page": "techsales.html",
+        "visible": true
+      },
+      {
+        "id": "beyond-bot-bybit",
+        "name": "Beyond-Bot-Bybit",
+        "url": "https://github.com/Beyond-Oraganization/Beyond-Bot-Bybit",
+        "description": "A .NET console application that automates trading on Bybit: pluggable strategies, indicators, order management and MySQL storage, built to run as a service on Linux.",
+        "stack": [
+          ".NET",
+          "Bybit",
+          "Trading"
+        ],
+        "page": "techbot.html",
+        "visible": true
+      },
+      {
+        "id": "beyond-website",
+        "name": "Beyond-Website",
+        "url": "https://github.com/Beyond-Oraganization/Beyond-Website",
+        "description": "This website. The home page and this page are generated from one config file by the site manager.",
+        "stack": [
+          "HTML",
+          "CSS",
+          "Python"
+        ],
+        "visible": true
+      }
+    ]
+  },
+  "plans": {
+    "title": "Built slowly, judged over the long run.",
+    "lead": "Detailed near, rough far away: the further the horizon, the more a plan is a direction and the less it is a schedule.",
+    "lanes": [
+      {
+        "id": "writing",
+        "label": "Writing",
+        "items": [
+          {
+            "id": "book-of-myths",
+            "title": "The book of myths",
+            "text": "The myths are already forming a book.",
+            "status": "In progress",
+            "visible": true
+          },
+          {
+            "id": "treatise",
+            "title": "The treatise",
+            "text": "A logical text, written slowly over many years.",
+            "status": "In progress",
+            "visible": true
+          },
+          {
+            "id": "rules",
+            "title": "The rules",
+            "text": "Twenty-seven so far, refined by contradiction.",
+            "status": "In progress",
+            "visible": true
+          }
+        ]
+      },
+      {
+        "id": "building",
+        "label": "Building",
+        "items": [
+          {
+            "id": "this-website",
+            "title": "This website",
+            "text": "The home of Beyondia: stories, ideas and tools in one place.",
+            "status": "In progress",
+            "visible": true
+          },
+          {
+            "id": "community-channels",
+            "title": "Community and channels",
+            "text": "Telegram, Discord and Instagram are open.",
+            "status": "Live",
+            "visible": true
+          },
+          {
+            "id": "technologies-github",
+            "title": "Technologies on GitHub",
+            "text": "Open work, available to everyone.",
+            "status": "In progress",
+            "visible": true
+          }
+        ]
+      },
+      {
+        "id": "horizon",
+        "label": "Horizon",
+        "items": [
+          {
+            "id": "nearest-plan",
+            "title": "Nearest plan",
+            "text": "Tomorrow: a new edit.",
+            "status": "Tomorrow",
+            "visible": true
+          },
+          {
+            "id": "video-edit-release",
+            "title": "Release of the video edit",
+            "text": "Publishing the finished video edit.",
+            "status": "Planned",
+            "visible": true
+          },
+          {
+            "id": "decade-plan",
+            "title": "[Decade-scale plan]",
+            "text": "[A direction, not a schedule.]",
+            "status": "Open",
+            "visible": true
+          }
+        ]
+      }
+    ],
+    "roadmap": {
+      "kicker": "The road ahead",
+      "title": "What comes next, in order.",
+      "intro": "Near steps are dated; far ones are only a direction.",
+      "steps": [
+        {
+          "id": "new-edit",
+          "when": "Tomorrow",
+          "title": "A new edit",
+          "text": "The next video edit is made.",
+          "status": "Next",
+          "visible": true
+        },
+        {
+          "id": "release-edit",
+          "when": "After the edit",
+          "title": "Release of the video edit",
+          "text": "The finished video edit is published.",
+          "status": "Planned",
+          "visible": true
+        }
+      ]
+    }
+  }
+}

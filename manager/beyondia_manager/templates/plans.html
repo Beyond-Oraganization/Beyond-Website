@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+{{head}}
+<body>
+<div class="page">
+
+  {{header}}
+
+  <section class="sec dark" aria-labelledby="page-title">
+    <div class="rl" aria-hidden="true"></div><div class="rt" aria-hidden="true"></div>
+    <svg class="rn" viewBox="-12 -7 24 14" width="24" height="14" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M-11 0Q0 -9 11 0Q0 9 -11 0Z"></path><circle r="3.4"></circle><circle r="1.3" fill="currentColor"></circle></g></svg>
+
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <a href="index.html">Home</a><span class="sep">/</span><span class="here">Plans</span>
+      </nav>
+
+      <div class="sec-head">
+        <p class="kicker">Plans</p>
+        <h1 id="page-title" class="h1">{{title}}</h1>
+        <p class="lead" style="max-width: 24em; margin-top: 32px; color: #BDBDB7">{{lead}}</p>
+      </div>
+
+      <div class="cols3">
+        {{lanes}}
+      </div>
+    </div>
+  </section>
+
+  <section class="sec alt" aria-labelledby="roadmap-title">
+    <div class="rl" aria-hidden="true"></div><div class="rt" aria-hidden="true"></div>
+    <svg class="rn" viewBox="-12 -7 24 14" width="24" height="14" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M-11 0Q0 -9 11 0Q0 9 -11 0Z"></path><circle r="3.4"></circle><circle r="1.3" fill="currentColor"></circle></g></svg>
+
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="kicker">{{roadmap_kicker}}</p>
+        <h2 id="roadmap-title" class="h2">{{roadmap_title}}</h2>
+        <p class="p mute" style="margin-top: 24px">{{roadmap_intro}}</p>
+      </div>
+
+      {{steps}}
+
+      <div class="pager">
+        <a href="ideology.html">
+          <span class="label">Previous</span>
+          <h3>Ideology</h3>
+        </a>
+        <a href="technologies.html" class="next">
+          <span class="label">Next</span>
+          <h3>Technologies</h3>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  {{footer}}
+
+</div>
+</body>
+</html>

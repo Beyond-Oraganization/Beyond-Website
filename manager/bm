@@ -1,0 +1,4 @@
+#!/bin/sh
+# Launcher: works from any folder, needs only python3 (3.9 or newer).
+here="$(cd "$(dirname "$0")" && pwd)"
+PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m beyondia_manager "$@"
