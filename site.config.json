@@ -148,6 +148,16 @@
           "Python"
         ],
         "visible": true
+      },
+      {
+        "id": "4",
+        "name": "Gymtronic",
+        "url": "https://github.com/Beyond-Oraganization/Gymtronic.git",
+        "description": "A python script that creates a certain workout plan based on user input",
+        "stack": [
+          "PYTHON"
+        ],
+        "visible": true
       }
     ]
   },
