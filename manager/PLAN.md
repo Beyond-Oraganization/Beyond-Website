@@ -176,3 +176,89 @@ Run with `manager/run_tests.sh` (or `python3 -m unittest discover -s manager/tes
 
 **Schema stays at 1.** The config was never published, so there is no old file to migrate; a missing `plans` section is reported as invalid with its path.
 
+## 13. Stories and a more comfortable interface (second round)
+
+Two requests: make the interface less crude, and let stories be changed and added. Stories are the largest content on the site (seven pages of prose and verses), so this round changes more than the earlier ones.
+
+### 13.1 What "story" means as data
+
+A story has an `id`, a `file` (its page, for example `storyangel.html`), a `title`, a `kind` (`story` or `verses`), a `tag` (the small label such as `#BeyondBible`), a `summary` (shown on the stories list), an `aside` (the one line beside the text), a `visible` flag and a `body`. The page `stories.html` (the list) and one page per visible story are generated, so five things stay consistent without effort: the list, each page, the previous/next links, the navigation and the count.
+
+**Existing file names are kept** (`storyangel.html`, `storyfactor.html`...). Those addresses may already have been shared; renaming them would break every link. A new story gets `story<id>.html`.
+
+**A story's file name must start with `story`.** Generated files are written into the site folder, and an unchecked name could overwrite `index.html` or `plans.html`. Validation enforces the prefix and uniqueness, so no story can replace another page.
+
+### 13.2 The body, and why it is a text format
+
+The existing stories are not uniform: plain paragraphs, a muted opening paragraph, section headings, and chapters of numbered verses (some with several paragraphs). The body is therefore stored as a list of typed **blocks** (`p`, `note`, `heading`, `chapter`, `verse`), which validation can check and the renderer can turn into the exact markup the CSS expects.
+
+Nobody should type JSON blocks. People edit the body as **plain text**, and the manager converts both ways:
+
+| You type | It becomes |
+|----------|-----------|
+| a paragraph (blank line before and after) | `p` (lines inside a paragraph are joined with a space) |
+| `> text` | `note`, the muted lead-in paragraph |
+| `## Title` | `heading` |
+| `# Chapter 1` | `chapter` |
+| `[1:1] text` | `verse` with reference 1:1 |
+| `+ text` straight after a verse | another paragraph of the same verse |
+| `\# text` | a paragraph that really starts with `#` (a leading backslash turns the special meaning off) |
+
+One parser and one writer (`storytext.py`) serve the command line and the interface. Tests prove that writing and parsing again gives the same blocks for every story on the site, so editing never silently changes a story. Errors name the line ("line 7: ...").
+
+### 13.3 Hiding and removing a story means deleting a page
+
+A story page is a file. If a story is removed or hidden, its page must disappear from the site, or the old text stays reachable and the list and the pages disagree. This is the one place the manager deletes files, so the rule is narrow:
+
+* every generated page starts with a comment saying it is generated;
+* the build deletes a file only if its name starts with `story`, it carries that comment, and no visible story owns it. A page you wrote by hand (no comment) is never touched;
+* `build --check` reports a pending deletion as out of date, so CI notices it too.
+
+**Publishing a deletion.** The list of files the publisher may commit used to be fixed. It is now computed: the three fixed files, the plans page, every story page the config knows, and story pages Git tracks that no longer exist on disk. Anything else is still refused (the earlier refusal tests remain). The commit uses `git add -A -- <those paths>`, which records deletions only for exactly those paths.
+
+### 13.4 The count on the home page
+
+The home tile said "Seven stories so far" by hand, which would be wrong after the first new story. Tile text may now contain `{stories}` ("seven") or `{Stories}` ("Seven"), replaced by the number of visible stories, in the same spirit as `{count}` in the map title.
+
+### 13.5 Interface: what was crude, and the fix
+
+| Problem found | Fix |
+|---------------|-----|
+| A refused add **emptied the whole form** (the page redrew from scratch), so a long text was lost on a typo | Drafts: what you typed is kept per form until it is saved; an error shows the reason and keeps your text |
+| One long column; preview squeezed beside it | Left menu of sections, a roomier editor, preview that can be hidden or opened in its own tab |
+| Six buttons on every row | Edit stays visible; Move, Hide and Remove sit in a menu; rows can also be **dragged** to reorder |
+| Errors were raw paths (`home.map.tiles[0].title: ...`) | Plain wording ("Title: must not be empty") |
+| No way back from a mistake | **Undo**: the manager remembers the last 50 states of the config in memory and restores one through the same validation. Undo **refuses** if the config no longer equals what the interface last left (the command line or an editor changed it), so it can never erase that work |
+| Leaving with unsaved edits lost them silently | A marker for unsaved edits, a browser warning on leaving, Ctrl/Cmd+S to save |
+| Forms did not focus or react to Enter or Escape | Focus on open, Enter saves single-line forms, Escape closes |
+| Long texts in a tiny box | The story editor has a full-width, monospace text area, a collapsible format guide and a live word count |
+
+**Not done on purpose.** No autosave: the config is what gets published, so a save should be a decision. Undo is per running session (memory), not stored on disk: Git is the permanent history. A story's page name cannot be changed after creation, so a shared link never breaks by accident.
+
+### 13.6 Tests added
+
+The suite grew from 224 to about 310 tests. Twelve more deliberate bugs were planted one at a time (escaping removed from the story writer, the `+` continuation rule, the generated-page marker check on deletions, the story-file-name confinement, the deletion of a removed page from the publishable set, the undo safety check, the check-mode no-delete guard, the pager chain, the home-page count, unescaped story text, drafts being rendered, and the name pattern on deletions). The suite failed for all of them except the last, which survived at first because a glob already narrowed the same names; a test for an upper-case generated page now covers it.
+
+Parser (every syntax, escapes, errors with line numbers, a write-then-parse round trip for every real story), validation, edits, rendering (escaping, pager chain, kinds, drafts excluded), build (orphan deletion only for marked story pages, hand-written pages never deleted, check mode reports it), publishing (a deletion is committed; other files still refused), the stories count, the CLI, the HTTP operations (including undo), and fixed checks on the interface file (no raw-markup calls, every operation it uses exists).
+
+## 14. The blog
+
+A blog differs from stories in four ways that shape the design.
+
+**Order comes from dates, not from a hand-kept list.** A post has a `date` (`YYYY-MM-DD`, checked as a real calendar date). The list shows the newest first; posts with the same date keep the order of the config. So there is no "move" for posts. The page shows dates exactly as written ("23 October 2026"), **never "today"**: a page that depends on the clock would change every day, and `build --check` and CI compare bytes. For the same reason there are no "scheduled" posts that appear by themselves on a future date; a post is published when you publish the site.
+
+**A post has tags and a reading time.** Tags are up to four short labels shown as pills. Reading time ("3 min read") is words divided by 200, rounded, at least 1. Both are computed, so they cannot go stale.
+
+**Posts need links; stories did not.** Inside a paragraph, `[text](https://example.com)` becomes a link. Only `http`/`https` links and pages of this site (`page.html`) are accepted, by the same rule as every other link in the config. A link the rule refuses is a **validation error that names the post**, not a silent plain-text fallback, so the author notices. The same text in a story is *not* turned into a link (stories keep their exact behaviour). Everything else about the body is the same plain text as stories (paragraph, `> note`, `## heading`); chapters and verses are refused in a post.
+
+**Page names.** A post page is `blog-<id>.html`. Because the id is a slug and the prefix includes a hyphen, two posts can never collide and `blog.html` (the list) can never be taken by a post. The rule "a generated page is deleted only if its name has a generated shape, it carries the generated comment, and nothing owns it" (section 13.3) now covers two families, `story*.html` and `blog-*.html`. Publishing a deletion follows the same path.
+
+**Drafts.** A draft has no page and is not listed; it comes back with its text when published. The real config starts with one draft post made of bracketed placeholder text (like the placeholders already on the site), so the editor has something to open and nothing unfinished is public.
+
+**Navigation.** `BLOG` is added to the navigation after `STORIES`. Generated pages take the navigation from one list in the code, but the ten hand-written pages (conclusions, ideology, community and so on) hold their own copy, so they were updated once by a script and the integrity check verifies all pages against the list. The cost is visible: adding another navigation item means touching those pages again. Turning them into generated pages would remove that cost and is the natural next step.
+
+**Editor conveniences added at the same time.** The short name (id) of a new story or post is suggested from the title as you type, until you edit it yourself.
+
+**Not done.** No feed (RSS/Atom): it needs the absolute address of the published site, which the config does not know. No comments, no images inside posts, no pagination (a list of a few dozen posts is fine on one page).
+
+**Tests for the blog.** The suite grew from 310 to about 360 tests. Ten more deliberate bugs were planted one at a time (links rendered without the safety rule, newest-first reversed, the date check, the post page family left out of deletion, post deletions left out of what `publish` commits, the page-name confinement, link validation, an unescaped title, repeated tags, chapters allowed in a post). The suite failed for every one. One test also freezes the clock and fails if the renderer ever reads today's date.

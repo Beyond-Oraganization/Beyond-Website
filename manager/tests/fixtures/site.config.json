@@ -36,9 +36,18 @@
           "id": "stories",
           "label": "Stories",
           "title": "Myths that carry the ideas",
-          "text": "Seven stories so far, and more still to come.",
-          "kids": "Rooms: seven stories and verses",
+          "text": "{Stories} stories so far, and more still to come.",
+          "kids": "Rooms: {stories} stories and verses",
           "href": "stories.html",
+          "visible": true
+        },
+        {
+          "id": "blog",
+          "label": "Blog",
+          "title": "Notes from the country",
+          "text": "Short writing about the ideas, the work and the news.",
+          "kids": "",
+          "href": "blog.html",
           "visible": true
         },
         {
@@ -260,5 +269,469 @@
         }
       ]
     }
+  },
+  "stories": {
+    "title": "Myths that carry the ideas.",
+    "lead": "Beyondia speaks in myths as well as in arguments. Each story is a room of its own.",
+    "items": [
+      {
+        "id": "angel",
+        "file": "storyangel.html",
+        "title": "The Angel Beyond",
+        "kind": "story",
+        "tag": "#BeyondBible",
+        "summary": "A man who climbed toward paradise and found hell, accepted it without hatred, and then decided that even while suffering he could stop the suffering of others.",
+        "aside": "How a man became an angel.",
+        "visible": true,
+        "body": [
+          {
+            "type": "note",
+            "text": "The story began when I woke up in the morning. Someone was knocking on the window. I decided to see who it was. I walked up to the window and pushed the curtain aside. There was an angel outside. I was frightened, but he calmed me down. He introduced himself as Beyond. He decided to tell me his story: the story of how he became an angel."
+          },
+          {
+            "type": "p",
+            "text": "Once there lived Beyond. As he climbed the mountain toward heaven, he was expecting paradise. But when Beyond arrived, he saw hell: people were unhappy, there was a heap of senseless pain, suffering, lust, envy and anger. Beyond went in, because he had nowhere else to go. Like the others, he began to suffer, but he did not complain. He accepted that this is how it is and how it has to be. Without hatred, simply with understanding. Suffering became his peace. The world slowly pushed him deeper into the grave. He did not understand why he should go on living. And then he looked around and saw that the others were suffering too. So Beyond decided that even if he suffers, he can still stop such suffering for others."
+          },
+          {
+            "type": "p",
+            "text": "For this he was taken up to heaven. He thought they would never accept him there again, and he had resigned himself. But he was warmly received. He was given a spear and a shield. He was led to the edge of heaven and shown how dark and terrifying it is below, compared to the heights. He was told that he came from there, and that his mission was to return and restore order. Beyond was very frightened and did not want to go. Going there was like voluntarily plunging into cold water. Yet he decided to descend. That is how Beyond became an angel."
+          }
+        ]
+      },
+      {
+        "id": "factor",
+        "file": "storyfactor.html",
+        "title": "Factor and Optima",
+        "kind": "story",
+        "tag": "Myth",
+        "summary": "Optima is the son of Factor: Factor, joined with wisdom. A builder who learns, through a storm, to work with connections rather than against them.",
+        "aside": "A father, a son, and a lesson about connection.",
+        "visible": true,
+        "body": [
+          {
+            "type": "p",
+            "text": "Optima is the son of Factor: Factor, but joined with wisdom. A builder who learns, through a storm, to work with connections rather than against them."
+          },
+          {
+            "type": "note",
+            "text": "[The full story will be added here.]"
+          }
+        ]
+      },
+      {
+        "id": "knowledge",
+        "file": "storyknowledge.html",
+        "title": "Knowledge",
+        "kind": "story",
+        "tag": "Story",
+        "summary": "A man reads a strange hand-painted book in a library: a story of someone who killed the devil, asked God for medicine, and made a salad from the forbidden fruit of knowledge.",
+        "aside": "A book, a salad, and the light of the mind.",
+        "visible": true,
+        "body": [
+          {
+            "type": "heading",
+            "text": "Introduction"
+          },
+          {
+            "type": "p",
+            "text": "It was an ordinary, quiet evening. Pavlo was walking home after a hard day at work. Today he did not want to eat anything heavy for dinner. He decided he wanted a tasty salad with apples, cabbage and carrots. He asked his wife for it, because he knew he could not make it himself. When he got home, he was surprised at how tasty the dish had turned out. He thanked his wife and they spent a good time together."
+          },
+          {
+            "type": "p",
+            "text": "In the evenings Pavlo liked to go to the library to read books. It was not far from home and was a very atmospheric place. There were lots of interesting books there, and reading them he always came out a different person. This time Pavlo wanted something new, so he went to the far section, where the most interesting but, at the same time, the hardest books were kept. He chose an interesting, recently delivered book. It had no description and no particularly catchy title, but its cover was painted with hand-drawn pictures, which drew his attention. He sat down at his favourite table and began to read his mysterious find."
+          },
+          {
+            "type": "heading",
+            "text": "The book · Part one"
+          },
+          {
+            "type": "p",
+            "text": "There lived a person who very much wanted to help others. Seeing all evil in the devil, the person went to kill him. Taking swords of hatred, the person descended into hell. The person reached the devil and killed him. The person impaled the former angel on their swords, lifted him above themselves and cut open his belly so that the blood poured over their face. The person began to drink his blood and became his kin."
+          },
+          {
+            "type": "p",
+            "text": "To heal those who were already sick, the person went to heaven to ask for medicine. The person walked on the stars to reach the right place. The person came to God and asked Him:"
+          },
+          {
+            "type": "p",
+            "text": "– Give me medicine for the sick, because I want to heal them."
+          },
+          {
+            "type": "p",
+            "text": "– Go to the garden and cook food from the fruits that I forbade to eat. The dish must be correctly prepared, correctly served and correctly eaten. If these conditions are not met, it will turn poisonous and kill those who taste it, – God answered."
+          },
+          {
+            "type": "p",
+            "text": "Hearing Him, the person went to the garden and picked the forbidden fruits of knowledge. The person made a salad from them and served it to people. Often people did not accept it, because it was too dangerous, but some dared to try. After they ate the dish to the end, they became healthy and urged everyone else to taste it."
+          },
+          {
+            "type": "heading",
+            "text": "The book · Part two"
+          },
+          {
+            "type": "p",
+            "text": "Around the healed people crystal domes grew, and mirrors appeared in their hands. The light of the sun shone on the crystal. Passing through the transparent half-sphere, the outside light turned into the inner light of feelings. Each person must reflect the refracted light with the mirror of their mind in order to be righteous and good. When the light is reflected from the mirror, it turns into the light of thoughts. To whichever part the light was directed, from there the water of actions will flow, which best feeds and nourishes the fruits that people can eat."
+          },
+          {
+            "type": "p",
+            "text": "Not everyone wanted to know where to reflect their light, and that is why they often went hungry. Those who did decide to find out where to shine had abundance, peace and prosperity in their lives. Every dome is different: in some the light does not pass in certain places, somewhere it is curved and refracts the light differently than in others. But those who explore their dome have their own, because they know where to shine."
+          },
+          {
+            "type": "heading",
+            "text": "Epilogue"
+          },
+          {
+            "type": "p",
+            "text": "After reading such an interesting and captivating book, Pavlo went home. After that he took hard books on different subjects, from mathematics to philosophy. His life only became more interesting and better, because he not only read but also used the knowledge he got from books and from life. Pavlo lived hand in hand with God, because he ate, in time and correctly, a correctly prepared salad."
+          }
+        ]
+      },
+      {
+        "id": "girl",
+        "file": "storygirl.html",
+        "title": "A Girl for One Day",
+        "kind": "story",
+        "tag": "Story",
+        "summary": "At a children’s birthday party, a young man notices a girl who notices him, and weighs whether to speak to her before the day ends.",
+        "aside": "A day that was allowed to end.",
+        "visible": true,
+        "body": [
+          {
+            "type": "p",
+            "text": "I came to my cousin’s birthday party. It took place in an entertainment club for children. There were trampolines, a pool of foam cubes and a monkey room."
+          },
+          {
+            "type": "p",
+            "text": "I enjoyed myself without a care on the trampolines, jumping into the pool. A little boy came up to me and said that I must be more serious. From his side it looked like a show of maturity. I understood that it was not awareness, but only an attempt to pretend to have it. So I decided that I would not pretend to be mature if I did not have maturity."
+          },
+          {
+            "type": "p",
+            "text": "At some point I noticed a beautiful girl looking at me. I was self-aware enough at that moment not to start pretending to be an adult, so I just went on with my fun."
+          },
+          {
+            "type": "p",
+            "text": "There were several occasions when, in an ordinary situation, I would have behaved formally. It was not so with her; it just did not work. At that moment it seemed to me that we had some mental connection."
+          },
+          {
+            "type": "p",
+            "text": "After several verbal collisions, I was told that it would soon be time to go home. We looked into each other’s eyes. Without looking away and without saying a word, I thought over whether I should get to know her:"
+          },
+          {
+            "type": "p",
+            "text": "– The girl is beautiful and seems normal, but is it worth it?"
+          },
+          {
+            "type": "p",
+            "text": "– I know that I will soon be leaving for home. I am sure that she and I would have a good conversation. I spend time with her wonderfully and I am sure that we could be good friends. If only I spoke to her, perhaps we would become so close that distance would not stop us."
+          },
+          {
+            "type": "p",
+            "text": "– I think it is not worth it, because everything good, even such a beautiful day, must end. Better let it remain a light and simple day of my life than the beginning of one more challenge."
+          },
+          {
+            "type": "p",
+            "text": "We parted without saying a single word to each other."
+          }
+        ]
+      },
+      {
+        "id": "gates",
+        "file": "storygates.html",
+        "title": "Before the Gates of Paradise",
+        "kind": "story",
+        "tag": "Story",
+        "summary": "A man who has finished his struggle stops at the golden gate, held back by his habit of the earthly swings of fate.",
+        "aside": "The last choice, made at the threshold.",
+        "visible": true,
+        "body": [
+          {
+            "type": "p",
+            "text": "Climbing the wide white stairs, I see a great golden gate. Having passed the judgment, I have been let through. Now all that is left is to walk through the gate, but I stop. Beyond it I see eternal peace and union with everything, but the habit of the mortal world holds me."
+          },
+          {
+            "type": "p",
+            "text": "I agreed to constant struggle in life. My contest seemed so long that I had said goodbye to peace. Once I enter Paradise, there will be nothing more: no falls and rises, no misfortune and happiness, no pain and relief. Nothing like that will ever be in my head again."
+          },
+          {
+            "type": "p",
+            "text": "Life brings misfortune, but because of it I can tell happiness apart, and so I will be at peace. I am used to the earthly swings of fate and would not like to leave them. After entering, I will not exist for myself, but I will still exist. I think it is worth connecting with everything through earthly feelings."
+          },
+          {
+            "type": "p",
+            "text": "I pass through the gate and enter Paradise."
+          }
+        ]
+      },
+      {
+        "id": "ants",
+        "file": "storyants.html",
+        "title": "Ants Must Not Bite an Elephant",
+        "kind": "story",
+        "tag": "Story",
+        "summary": "Two friends take a cleaning job at a gigantic corporation, and the narrator tries to find out what is happening inside it.",
+        "aside": "What happens to those who dig under a giant.",
+        "visible": true,
+        "body": [
+          {
+            "type": "p",
+            "text": "My friends Alina and Vita were looking for work. They were not picky about vacancies, because for a long time nothing had worked out for them. After a long search, through connections, they found a job at one huge firm, as cleaners."
+          },
+          {
+            "type": "p",
+            "text": "The brutal building of the corporation that they were to clean was monstrously huge. It was so big that its dimensions were comparable to a metropolis. It was a small city made of two disproportionately joined parallelepipeds: a small lower one stood like a book on a shelf under the elongated, larger one in front, which rested on the smaller one as if on a column supporting its rear part. The large windows did not help reduce its size, but only increased it, because of how many of them there were on the walls. If you grasp the size of those continuous windows (they were about two or three people tall), you feel uneasy seeing how ordinary they were. The entrance to the lower, smaller section was lit with a white light that did not even reach the upper block. Slightly sinister in its size, the building stands in the middle of a field surrounded by forest, which separated the company’s territory from the city."
+          },
+          {
+            "type": "p",
+            "text": "After getting the job, Alina did not get in touch for a long time. Sensing a quiet danger that, like a predator, hid in the shadow of calm, I decided to ask people more about the company."
+          },
+          {
+            "type": "p",
+            "text": "I found out that the building is generally divided into three parts: residential, the company’s offices, and a third, unclear one, usually called the construction part. There were also stories about people disappearing. People said the work was good, but from time to time strange things happened: harassment, bribery, payment for silence or blackmail. So I decided to pull Alina and Vita out of this swamp and started looking for more information about the company, but found only more information about the division of the building: in fact it was not only the “construction” part that was unclear, but also the office part, where most of the incidents took place."
+          },
+          {
+            "type": "p",
+            "text": "After some time I found out that Vita had quit that job. This only confirmed my fears about the company. I talked to her, but she gave me no concrete information, so I could draw conclusions only from the very fact that she quit. The more I learned about the company, the more I understood that digging under it was dangerous."
+          },
+          {
+            "type": "p",
+            "text": "After a few more days of searching I am sitting in a park on a bench. The day was bright. Two stylishly and neatly dressed people came up to me. The two men were of different heights. The taller one inspired an inner unease. I stand up, leaving my things on the bench. His movements and low timbre of voice killed any hope of negotiation (he was the first to approach):"
+          },
+          {
+            "type": "p",
+            "text": "– Good day. I have come to warn you against any further actions or investigations concerning our company. Stop this."
+          },
+          {
+            "type": "p",
+            "text": "I feel naked, my thoughts as if fully written out on an abstract sheet that is read without any cover. Understanding that the situation is lost, I want to beg for at least some part of freedom. Collecting myself, I decide to throw at the man, who was already walking back, my veiled ultimatum:"
+          },
+          {
+            "type": "p",
+            "text": "– I do not understand why you are so aggressive toward me! What exactly can’t I do? Even google you?!"
+          },
+          {
+            "type": "p",
+            "text": "They answered me harshly and clearly. The taller man, like a stately warrior with a spear in his hand, finishes off all my still-living impulses. He answers me with a hint of a sigh, but harshly and clearly:"
+          },
+          {
+            "type": "p",
+            "text": "– You have no right to speak to me in a raised tone. You have forgotten your position. You will pay for it."
+          },
+          {
+            "type": "p",
+            "text": "Calmly coming up to me, he hit me. Losing consciousness, I noticed the shorter one rummaging through my things."
+          },
+          {
+            "type": "p",
+            "text": "After I came to, I immediately checked my things. Everything was in place, but the phone would not turn on even after charging, and the computer, once turned on, showed a single screen that could not be changed in any way. Two or three days later I was taken to a psychiatric ward with a diagnosis of paranoia."
+          }
+        ]
+      },
+      {
+        "id": "roman",
+        "file": "storyroman.html",
+        "title": "The Book of Roman",
+        "kind": "verses",
+        "tag": "Verses",
+        "summary": "Four chapters in verses: the fall of Askold, the vine and the pole, a soul at the golden gate, and the light of the mind.",
+        "aside": "A fall, a climb, a gate and a light: four chapters in verses.",
+        "visible": true,
+        "body": [
+          {
+            "type": "chapter",
+            "text": "Chapter 1"
+          },
+          {
+            "type": "verse",
+            "ref": "1:1",
+            "paras": [
+              "Long ago there lived two descendants of Adam and Eve. They were called Olha and Askold. They lived in a place very similar to Eden, but still not in it. There was a lot of everything there: food, livestock, materials for life. But neither Olha nor Askold were any longer like their ancestors. Olha was not created from Askold’s rib. Once the devil visited them and persuaded Askold to fall in love with Olha. He did so, but nothing came of it between him and her. Seeing Askold’s weakness and pliability, God ordered the devil to bind him and drag him out of the garden."
+            ]
+          },
+          {
+            "type": "verse",
+            "ref": "1:2",
+            "paras": [
+              "The devil came and did it. At first Askold stopped seeing in the garden what he had seen before, though the garden was the same. It turned into a curtain behind which stood something more real. Then Askold wanted to find out what stood behind it. By such actions Askold bound and twisted himself more and more. The garden had edges. Beyond them there was nothing, only the dark emptiness of the unknown. Below, somewhere in the middle between the garden and the unknown, there was a place from which danger blew. The devil dragged the bound Askold to the bottom and threw him into the abyss."
+            ]
+          },
+          {
+            "type": "verse",
+            "ref": "1:3",
+            "paras": [
+              "The farther he fell, the more he understood why he had felt that danger before the fall. Far away in dark clouds there were demons that lay in wait for everyone who fell downward. He had to fight them to move on. Fortunately Askold recovered very quickly, so he hoped he would be able to make it through the demons. But the evil spirits were hungry. While Askold killed demons by the hundreds, they managed to gnaw him down to the bones several times. At some point there were so many of them that they ground his bones to dust."
+            ]
+          },
+          {
+            "type": "chapter",
+            "text": "Chapter 2"
+          },
+          {
+            "type": "verse",
+            "ref": "2:1",
+            "paras": [
+              "His blood and dust seeped through the demons and passed them. Below was the place that Askold had so dreamed of reaching while he fell. What was left of him turned into fertiliser, which reached the ground under the misfortunes from above. From the heap of fertiliser grew a strong, thick grapevine. It wound around a thin, tall and hard pole."
+            ]
+          },
+          {
+            "type": "verse",
+            "ref": "2:2",
+            "paras": [
+              "One of the branches of the vine that grew from Askold’s dust bore a fruit. In that fruit Askold was reborn and went on being himself. An angel caught me and carried me up the mountain so that I could see what I had been so strongly drawn to when I was above."
+            ]
+          },
+          {
+            "type": "verse",
+            "ref": "2:3",
+            "paras": [
+              "I look around and see that I am not the only one. Every person has their own pole with a vine. It turned out that it appears at the birth of every person. A thin rod, something like the handle of a tool, stands upright beside each person. The ends of the handles are very sharp. They all have different lengths depending on the person. For some the pole is no higher than the trees, and for others it is almost infinitely high. A vine always winds around the handle. If the pole is high, the stems of the vine are usually very thick, and the other way round: if the pole is low, they are thin."
+            ]
+          },
+          {
+            "type": "verse",
+            "ref": "2:4",
+            "paras": [
+              "I, like all other people, was born at the foot of the pole. We eat the fruits of our own vines and of other people’s. Sometimes we can find great, tasty and juicy branches, but most often we come across either leftovers or half-eaten scraps. We have to come to terms with this. But if someone does not want to come to terms, they have to climb up. The higher they are, the better, juicier and tastier the fruits are."
+            ]
+          },
+          {
+            "type": "verse",
+            "ref": "2:5",
+            "paras": [
+              "I decide that I will climb up. While climbing I notice how the poles are connected to one another by the vines. I could have crossed over along one of those vines, but then I would never have reached the top. Back when I flew with the angel I noticed that the branches of the vine can lead to very different places: to paradise or to hell, or somewhere between them, depending on how lucky you are."
+            ]
+          },
+          {
+            "type": "verse",
+            "ref": "2:6",
+            "paras": [
+              "For most people the second scenario suits best, when you turn aside from your original path and guess at some better one. Not everyone wants to climb up. But I did. I was one of those people who want to find out what is up there. Sometimes there are also those who simply want better fruits. In general, it is for these two reasons that people decide to climb. None of us knows what awaits us at the top. All of us who dared to climb are known by a feeling. The strength of the feeling determines whether we will be able to climb to the end of our rod."
+            ]
+          },
+          {
+            "type": "verse",
+            "ref": "2:7",
+            "paras": [
+              "I do reach my end. I am so tired that there is no way back. That is normal, because while I was climbing the thick vine became less. One goes away, another comes, but the vine gets thinner. If before I could lean on some stem, now I am forced to hold on constantly so as not to fall. In time only my rod was left and nothing more. It is slippery, the nights are cold, there is the constant temptation that something better may be below: everything tried to stop me. I withstood all the trials, even the strong winds over which I had no influence."
+            ]
+          },
+          {
+            "type": "verse",
+            "ref": "2:8",
+            "paras": [
+              "And here it is, THE END, I have reached it. There is no one there, nothing there, only emptiness and silence. Around me are the same tips of handles as mine. On some of them hang impaled the bodies of people like me. There are only two ways out of there: either to fall, or to impale myself, as the others do. If I fall, I will die as rot that turns into the earth on which my descendants will later walk. It is different if I choose to impale myself. I will fall until my pierced body is stopped by a sufficiently thick vine stem. When that happens, my blood will flow down along the stems and feed them. Thanks to it the stems will grow and give more fruit. Fruit that will feed those who did not die for it."
+            ]
+          },
+          {
+            "type": "verse",
+            "ref": "2:9",
+            "paras": [
+              "I decide to impale myself on the rod. My blood fed the vine and it gave good fruit. My body will stay on the rod until the end of the ages. My soul was taken by the angel to heaven and left there."
+            ]
+          },
+          {
+            "type": "chapter",
+            "text": "Chapter 3"
+          },
+          {
+            "type": "verse",
+            "ref": "3:1",
+            "paras": [
+              "It will climb the wide white stairs. Seeing a great golden gate, it will pass the judgment. It will be let through, and then all that is left is to walk through the gate. But I am afraid it will stop. Seeing beyond it eternal peace and union with everything, it will be held by a heavy habit of the mortal world. I and my soul sincerely agreed to constant struggle in life. Our contest seemed so long that we had said goodbye to peace. Once it enters Paradise, there will be nothing more: no falls and rises, no misfortune and happiness, no pain and relief; my soul will never experience such things again. Life brings misfortune, but precisely because of that it could tell happiness apart, so it will be at peace. I want it to grow unused to the earthly swings of fate and to want to leave them. After the entrance, I will not exist for it, but it will still exist. I think it is worth connecting with everything through earthly feelings. It will pass through the gate and enter Paradise."
+            ]
+          },
+          {
+            "type": "chapter",
+            "text": "Chapter 4"
+          },
+          {
+            "type": "verse",
+            "ref": "4:1",
+            "paras": [
+              "Help-for-Others, seeing all evil in the devil, will go to kill him. Taking swords of hatred, she descended into hell. Having reached the devil, she will kill him. Help-for-Others will impale the former angel on her swords, lift him above herself and cut open his belly. She will gather the blood and flesh from the devil. Having drunk the blood and eaten the flesh, she will become kin to the unclean, she will turn into Desire.",
+              "In order for the desire to fulfil itself, it will go to heaven to ask for medicine. It stepped on the constellation of Aquarius to reach the right place and to share water with the thirsty. Having come to God, it asked Him:",
+              "– Give me medicine for the sick, because I want to heal them.",
+              "– Go to the garden and cook food from the fruits that I forbade to eat. The dish must be correctly prepared, correctly served and correctly eaten. If these conditions are not met, it will turn poisonous and kill those who taste it, – God answered.",
+              "Hearing Him, the desire went to the garden and picked the forbidden fruits of knowledge. It made a salad of them and served it to people. Often people did not accept the salad, because it was too dangerous, but some dared to try. After they ate the dish to the end, they became healthy and urged everyone else to taste it."
+            ]
+          },
+          {
+            "type": "verse",
+            "ref": "4:2",
+            "paras": [
+              "In the healed minds of people mirrors appeared. Like a crystal in the shape of a dome, a body grew around the healthy mind. The outside world fell on the crystal, as the rays of the sun fall on the surface of water. Passing through the body half-sphere, the outside light turned into the inner light of feeling. Every person must reflect the refracted light with the mirror of their mind. When the light is reflected from the mirror, it turns into the light of thoughts. To whichever part of the dome of the body the light was directed, from there the water of actions will flow, which best nourishes the fruits that people can then eat.",
+              "Not every mind knew where to reflect its light, and that is why it often suffered from hunger or thirst. The mind that did decide to find out where to shine had abundance, peace and prosperity in its life. Every dome is different: in some the light does not pass in certain places, somewhere it is curved and refracts light differently than in others. But the mind that explored it had its own, because it knew where to shine."
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "blog": {
+    "title": "Notes from the country.",
+    "lead": "Short writing about the ideas, the work and the news, newest first.",
+    "items": [
+      {
+        "id": "welcome",
+        "file": "blog-welcome.html",
+        "title": "Welcome to the blog",
+        "date": "2026-10-01",
+        "tags": [
+          "News",
+          "Ideas"
+        ],
+        "summary": "Why this blog exists and what will be in it.",
+        "visible": true,
+        "body": [
+          {
+            "type": "p",
+            "text": "This blog holds short writing about the ideas and the work of Beyondia."
+          },
+          {
+            "type": "heading",
+            "text": "What to expect"
+          },
+          {
+            "type": "p",
+            "text": "Notes, news and drafts of thoughts. The code lives on [GitHub](https://github.com/Beyond-Oraganization)."
+          }
+        ]
+      },
+      {
+        "id": "second-note",
+        "file": "blog-second-note.html",
+        "title": "A second note",
+        "date": "2026-10-15",
+        "tags": [
+          "Ideas"
+        ],
+        "summary": "A shorter note.",
+        "visible": true,
+        "body": [
+          {
+            "type": "note",
+            "text": "A short opening."
+          },
+          {
+            "type": "p",
+            "text": "Some more text."
+          }
+        ]
+      },
+      {
+        "id": "draft-note",
+        "file": "blog-draft-note.html",
+        "title": "An unfinished note",
+        "date": "2026-10-20",
+        "tags": [],
+        "summary": "Not ready.",
+        "visible": false,
+        "body": [
+          {
+            "type": "p",
+            "text": "Work in progress."
+          }
+        ]
+      }
+    ]
   }
 }

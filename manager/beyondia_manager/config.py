@@ -6,6 +6,7 @@ need the disk (does a linked page exist?) live in ``checks.py``.
 
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import re
@@ -37,6 +38,26 @@ LEN_TITLE = 80
 LEN_LONG = 240       # lead, text, intro, description
 LEN_KIDS = 120
 LEN_NAME = 60
+STORY_KINDS = ("story", "verses")
+STORY_FILE_RE = re.compile(r"^story[a-z0-9_-]*\.html$")
+MAX_STORIES = 100
+BODY_BLOCKS = (1, 600)
+LEN_TAG = 30
+LEN_SUMMARY = 400
+LEN_ASIDE = 120
+LEN_PARA = 8000
+LEN_REF = 12
+VERSE_REF_RE = re.compile(r"^[0-9A-Za-z.:-]{1,12}$")
+POST_FILE_RE = re.compile(r"^blog-[a-z0-9]+(?:-[a-z0-9]+)*\.html$")
+# Every generated page that belongs to one item (a story or a post). Deletion of orphans is limited to these shapes.
+ITEM_PAGE_RE = re.compile(r"^(?:story[a-z0-9_-]*|blog-[a-z0-9_-]+)\.html$")
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+# [label](url); the url may contain one level of parentheses, as in .../Foo_(bar)
+LINK_RE = re.compile(r"\[([^\[\]]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)")
+MAX_POSTS = 500
+MAX_POST_TAGS = 4
+LEN_POST_TAG = 24
+POST_BLOCK_TYPES = ("p", "note", "heading")
 LANE_RANGE = (1, 3)      # the page lays lanes out in three columns
 LANE_ITEMS = (0, 12)
 MAX_STEPS = 24
@@ -146,7 +167,7 @@ def validate(data: Any) -> List[str]:
 
     if data.get("schema") != SCHEMA_VERSION or isinstance(data.get("schema"), bool):
         problems.append(f"schema: must be {SCHEMA_VERSION}")
-    _require(data, ["site", "home", "github", "plans"], "config", problems)
+    _require(data, ["site", "home", "github", "plans", "stories", "blog"], "config", problems)
 
     site = data.get("site")
     if site is not None and _is_dict(site, "site", problems):
@@ -169,6 +190,14 @@ def validate(data: Any) -> List[str]:
     plans = data.get("plans")
     if plans is not None and _is_dict(plans, "plans", problems):
         _validate_plans(plans, problems)
+
+    stories = data.get("stories")
+    if stories is not None and _is_dict(stories, "stories", problems):
+        _validate_stories(stories, problems)
+
+    blog = data.get("blog")
+    if blog is not None and _is_dict(blog, "blog", problems):
+        _validate_blog(blog, problems)
     return problems
 
 
@@ -310,6 +339,130 @@ def _validate_plans(plans: Dict[str, Any], problems: List[str]) -> None:
                     step, f"plans.roadmap.steps[{k}]",
                     [("when", LEN_WHEN), ("title", LEN_TITLE), ("text", LEN_LONG), ("status", LEN_STATUS)], problems)
             _unique_ids(roadmap["steps"], "plans.roadmap.steps", problems)
+
+
+def _validate_stories(stories: Dict[str, Any], problems: List[str]) -> None:
+    _require(stories, ["title", "lead", "items"], "stories", problems)
+    if "title" in stories:
+        _is_text(stories["title"], "stories.title", LEN_TITLE, problems)
+    if "lead" in stories:
+        _is_text(stories["lead"], "stories.lead", LEN_LONG, problems)
+    if "items" not in stories or not _is_list(stories["items"], "stories.items", problems, 0, MAX_STORIES):
+        return
+    items = stories["items"]
+    files: Dict[str, int] = {}
+    for i, story in enumerate(items):
+        path = f"stories.items[{i}]"
+        if not _is_dict(story, path, problems):
+            continue
+        _require(story, ["id", "file", "title", "kind", "tag", "summary", "aside", "visible", "body"], path, problems)
+        if "id" in story:
+            _is_slug(story["id"], f"{path}.id", problems)
+        if "file" in story:
+            if not isinstance(story["file"], str) or not STORY_FILE_RE.match(story["file"]) or len(story["file"]) > 60:
+                problems.append(f"{path}.file: must look like story<name>.html (it must start with 'story' so it can never replace another page)")
+            elif story["file"] in files:
+                problems.append(f"{path}.file: '{story['file']}' is already used by stories.items[{files[story['file']]}]")
+            else:
+                files[story["file"]] = i
+        if "title" in story:
+            _is_text(story["title"], f"{path}.title", LEN_TITLE, problems)
+        if "kind" in story and story["kind"] not in STORY_KINDS:
+            problems.append(f"{path}.kind: must be one of {', '.join(STORY_KINDS)}")
+        if "tag" in story:
+            _is_text(story["tag"], f"{path}.tag", LEN_TAG, problems)
+        if "summary" in story:
+            _is_text(story["summary"], f"{path}.summary", LEN_SUMMARY, problems)
+        if "aside" in story:
+            _is_text(story["aside"], f"{path}.aside", LEN_ASIDE, problems)
+        if "visible" in story:
+            _is_bool(story["visible"], f"{path}.visible", problems)
+        if "body" in story and _is_list(story["body"], f"{path}.body", problems, *BODY_BLOCKS):
+            for j, block in enumerate(story["body"]):
+                _validate_block(block, f"{path}.body[{j}]", problems)
+    _unique_ids(items, "stories.items", problems)
+
+
+def valid_date(value: Any) -> bool:
+    if not isinstance(value, str) or not DATE_RE.match(value):
+        return False
+    try:
+        datetime.date.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
+
+
+def _validate_blog(blog: Dict[str, Any], problems: List[str]) -> None:
+    _require(blog, ["title", "lead", "items"], "blog", problems)
+    if "title" in blog:
+        _is_text(blog["title"], "blog.title", LEN_TITLE, problems)
+    if "lead" in blog:
+        _is_text(blog["lead"], "blog.lead", LEN_LONG, problems)
+    if "items" not in blog or not _is_list(blog["items"], "blog.items", problems, 0, MAX_POSTS):
+        return
+    files: Dict[str, int] = {}
+    for i, post in enumerate(blog["items"]):
+        path = f"blog.items[{i}]"
+        if not _is_dict(post, path, problems):
+            continue
+        _require(post, ["id", "file", "title", "date", "tags", "summary", "visible", "body"], path, problems)
+        if "id" in post:
+            _is_slug(post["id"], f"{path}.id", problems)
+        if "file" in post:
+            if not isinstance(post["file"], str) or not POST_FILE_RE.match(post["file"]) or len(post["file"]) > 60:
+                problems.append(f"{path}.file: must look like blog-<name>.html (it must start with 'blog-' so it can never replace another page)")
+            elif post["file"] in files:
+                problems.append(f"{path}.file: '{post['file']}' is already used by blog.items[{files[post['file']]}]")
+            else:
+                files[post["file"]] = i
+        if "title" in post:
+            _is_text(post["title"], f"{path}.title", LEN_TITLE, problems)
+        if "date" in post and not valid_date(post["date"]):
+            problems.append(f"{path}.date: must be a real date written YYYY-MM-DD (for example 2026-10-23)")
+        if "tags" in post and _is_list(post["tags"], f"{path}.tags", problems, 0, MAX_POST_TAGS):
+            for j, tag in enumerate(post["tags"]):
+                _is_text(tag, f"{path}.tags[{j}]", LEN_POST_TAG, problems)
+            if all(isinstance(t, str) for t in post["tags"]) and len({t.lower() for t in post["tags"]}) != len(post["tags"]):
+                problems.append(f"{path}.tags: the same tag is listed twice")
+        if "summary" in post:
+            _is_text(post["summary"], f"{path}.summary", LEN_SUMMARY, problems)
+        if "visible" in post:
+            _is_bool(post["visible"], f"{path}.visible", problems)
+        if "body" in post and _is_list(post["body"], f"{path}.body", problems, *BODY_BLOCKS):
+            for j, block in enumerate(post["body"]):
+                bpath = f"{path}.body[{j}]"
+                if isinstance(block, dict) and block.get("type") not in POST_BLOCK_TYPES and block.get("type") in ("chapter", "verse"):
+                    problems.append(f"{bpath}.type: chapters and verses are for stories; a post uses paragraphs, notes and headings")
+                    continue
+                _validate_block(block, bpath, problems)
+                if isinstance(block, dict) and block.get("type") in ("p", "note") and isinstance(block.get("text"), str):
+                    for match in LINK_RE.finditer(block["text"]):
+                        why = url_problem(match.group(2))
+                        if why:
+                            problems.append(f"{bpath}.text: the link '{match.group(2)}' is not allowed ({why})")
+    _unique_ids(blog["items"], "blog.items", problems)
+
+
+def _validate_block(block: Any, path: str, problems: List[str]) -> None:
+    if not _is_dict(block, path, problems):
+        return
+    kind = block.get("type")
+    if kind in ("p", "note"):
+        _is_text(block.get("text"), f"{path}.text", LEN_PARA, problems)
+    elif kind == "heading":
+        _is_text(block.get("text"), f"{path}.text", LEN_TITLE, problems)
+    elif kind == "chapter":
+        _is_text(block.get("text"), f"{path}.text", LEN_SHORT, problems)
+    elif kind == "verse":
+        ref = block.get("ref")
+        if not isinstance(ref, str) or not VERSE_REF_RE.match(ref):
+            problems.append(f"{path}.ref: must be 1 to {LEN_REF} letters, digits, '.', ':' or '-' (for example 1:1)")
+        if _is_list(block.get("paras"), f"{path}.paras", problems, 1, 12):
+            for k, para in enumerate(block["paras"]):
+                _is_text(para, f"{path}.paras[{k}]", LEN_PARA, problems)
+    else:
+        problems.append(f"{path}.type: must be one of p, note, heading, chapter, verse")
 
 
 def _validate_plan_fields(item: Any, path: str, texts: List[Any], problems: List[str]) -> None:

@@ -6,81 +6,143 @@
 <title>Beyondia manager</title>
 <style>
 :root {
-  --bg: #C8C8C2; --panel: #D3D3CD; --ink: #1B1B1A; --mute: #55554F; --line: #1B1B1A;
-  --ok: #1F5A2E; --bad: #8A1F1F; --warn: #7A5A00;
-  --f-d: "Archivo Black", "Arial Black", Impact, sans-serif;
+  --bg: #EDECE7; --surface: #F8F7F3; --surface2: #E4E3DD; --ink: #1E1E1C; --mute: #66665F; --line: #CFCEC6; --line2: #A9A89F;
+  --accent: #1E1E1C; --accent-ink: #F8F7F3; --focus: #2B5BD7;
+  --ok: #1F6A36; --bad: #A12626; --bad-bg: #F6DEDC; --warn: #8A6200; --warn-bg: #F4E8C4; --ok-bg: #DCEBDD;
   --f-t: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --f-r: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #181817; --surface: #222220; --surface2: #2C2C29; --ink: #ECEBE5; --mute: #A3A29A; --line: #3A3A36; --line2: #5A5A54;
+    --accent: #ECEBE5; --accent-ink: #1E1E1C; --focus: #7DA2FF; --ok: #7BC98E; --bad: #FF8F86; --bad-bg: #3C2423; --warn: #E3BC5A; --warn-bg: #3A3220; --ok-bg: #213426; }
+  html { color-scheme: dark; }
 }
 * { box-sizing: border-box; }
-html { color-scheme: light; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-r); }
+html { color-scheme: light dark; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--f-r); }
 button, input, select, textarea { font: inherit; color: inherit; }
-.top { background: var(--ink); color: #D9D9D3; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding: 14px 20px; border-bottom: 4px solid var(--ink); }
-.top h1 { font: 20px/1 var(--f-d); letter-spacing: .04em; margin: 0; text-transform: uppercase; }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
-.chip { font: 12px/1 var(--f-t); text-transform: uppercase; letter-spacing: .06em; padding: 6px 8px; border: 2px solid #D9D9D3; }
-.chip.ok { background: #D9D9D3; color: var(--ok); } .chip.bad { background: var(--bad); border-color: var(--bad); color: #fff; } .chip.warn { background: #E5C65A; border-color: #E5C65A; color: var(--ink); }
-.layout { display: grid; grid-template-columns: minmax(360px, 560px) 1fr; gap: 0; min-height: calc(100vh - 60px); }
-@media (max-width: 980px) { .layout { grid-template-columns: 1fr; } .preview { min-height: 70vh; border-left: 0 !important; border-top: 4px solid var(--ink); } }
-.editor { padding: 20px; min-width: 0; }
-.tabs { display: flex; flex-wrap: wrap; gap: 0; margin-bottom: 20px; border: 4px solid var(--ink); }
-.tabs button { flex: 1; border: 0; border-right: 4px solid var(--ink); background: var(--panel); padding: 10px 8px; font: 13px/1 var(--f-t); text-transform: uppercase; letter-spacing: .06em; cursor: pointer; }
-.tabs button:last-child { border-right: 0; }
-.tabs button[aria-selected="true"] { background: var(--ink); color: #D9D9D3; }
-.tabs button:focus-visible, .btn:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid #2B5BD7; outline-offset: 2px; }
-h2 { font: 22px/1.1 var(--f-d); text-transform: uppercase; margin: 0 0 6px; }
-h3 { font: 13px/1 var(--f-t); text-transform: uppercase; letter-spacing: .08em; margin: 28px 0 10px; padding-top: 14px; border-top: 4px solid var(--ink); }
-.hint { color: var(--mute); font-size: 13px; margin: 0 0 14px; }
-.card { background: var(--panel); border: 4px solid var(--ink); padding: 12px 14px; margin-bottom: 10px; }
-.card.hidden { opacity: .62; }
-.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.row .grow { flex: 1; min-width: 0; }
-.name { font: 600 15px/1.25 var(--f-r); overflow-wrap: anywhere; }
-.meta { font: 12px/1.4 var(--f-t); color: var(--mute); overflow-wrap: anywhere; }
-.badge { font: 11px/1 var(--f-t); text-transform: uppercase; padding: 3px 5px; border: 2px solid var(--ink); margin-left: 6px; }
-.btn { border: 3px solid var(--ink); background: var(--bg); padding: 6px 10px; font: 12px/1.1 var(--f-t); text-transform: uppercase; letter-spacing: .05em; cursor: pointer; }
-.btn:hover:not(:disabled) { background: var(--ink); color: #D9D9D3; }
-.btn:disabled { opacity: .4; cursor: not-allowed; }
-.btn.primary { background: var(--ink); color: #D9D9D3; } .btn.primary:hover:not(:disabled) { background: #3A3A37; }
-.btn.danger { border-color: var(--bad); color: var(--bad); } .btn.danger:hover:not(:disabled) { background: var(--bad); color: #fff; }
-label { display: block; font: 12px/1.2 var(--f-t); text-transform: uppercase; letter-spacing: .06em; margin: 12px 0 4px; }
-input[type=text], textarea, select { width: 100%; background: #E4E4DE; border: 3px solid var(--ink); padding: 8px 10px; border-radius: 0; }
-textarea { min-height: 76px; resize: vertical; }
-.count { font: 11px/1 var(--f-t); color: var(--mute); float: right; }
-.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-details.add { border: 4px solid var(--ink); background: var(--panel); margin-top: 12px; }
-details.add > summary { cursor: pointer; padding: 10px 14px; font: 13px/1 var(--f-t); text-transform: uppercase; letter-spacing: .06em; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+a { color: inherit; }
+[hidden] { display: none !important; }
+
+/* --- frame --- */
+.top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 10px 18px; flex-wrap: wrap; padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.brand { font: 700 14px/1 var(--f-t); letter-spacing: .1em; text-transform: uppercase; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { font: 12px/1 var(--f-t); padding: 5px 8px; border-radius: 999px; background: var(--surface2); color: var(--mute); }
+.chip.ok { background: var(--ok-bg); color: var(--ok); } .chip.bad { background: var(--bad-bg); color: var(--bad); } .chip.warn { background: var(--warn-bg); color: var(--warn); }
+.top .space { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.shell { display: grid; grid-template-columns: 188px minmax(0, 1fr) minmax(340px, 42%); min-height: calc(100vh - 53px); }
+.shell.nopreview { grid-template-columns: 188px minmax(0, 1fr); }
+.rail { padding: 16px 10px; border-right: 1px solid var(--line); position: sticky; top: 53px; align-self: start; height: calc(100vh - 53px); }
+.rail button { display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; border: 0; background: transparent; padding: 9px 12px; border-radius: var(--r); cursor: pointer; font-weight: 500; margin-bottom: 2px; }
+.rail button:hover { background: var(--surface2); }
+.rail button[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
+.rail .n { font: 12px/1 var(--f-t); opacity: .7; }
+.editor { padding: 24px clamp(16px, 3vw, 40px) 120px; min-width: 0; max-width: 860px; width: 100%; }
+.preview { border-left: 1px solid var(--line); background: var(--surface2); display: flex; flex-direction: column; position: sticky; top: 53px; height: calc(100vh - 53px); }
+.pbar { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px; background: var(--surface); border-bottom: 1px solid var(--line); align-items: center; }
+.pframe { flex: 1; display: flex; justify-content: center; overflow: auto; }
+.pframe iframe { border: 0; background: #fff; width: 100%; height: 100%; }
+.pframe.phone iframe { width: 390px; max-width: 100%; box-shadow: 0 0 0 1px var(--line2); }
+@media (max-width: 1180px) {
+  .shell, .shell.nopreview { grid-template-columns: 1fr; }
+  .rail { position: static; height: auto; display: flex; flex-wrap: wrap; gap: 4px; border-right: 0; border-bottom: 1px solid var(--line); padding: 8px 12px; }
+  .rail button { width: auto; gap: 8px; margin: 0; }
+  .preview { position: static; height: 80vh; border-left: 0; border-top: 1px solid var(--line); }
+}
+
+/* --- text --- */
+h2 { font-size: 24px; line-height: 1.2; margin: 0 0 4px; letter-spacing: -.01em; }
+h3 { font: 600 12px/1 var(--f-t); text-transform: uppercase; letter-spacing: .1em; color: var(--mute); margin: 34px 0 12px; display: flex; align-items: center; gap: 10px; }
+h3::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.hint { color: var(--mute); font-size: 13.5px; margin: 0 0 14px; }
+.meta { font: 12px/1.45 var(--f-t); color: var(--mute); overflow-wrap: anywhere; }
+.empty { border: 1px dashed var(--line2); border-radius: var(--r); padding: 18px; color: var(--mute); text-align: center; }
+
+/* --- controls --- */
+.btn { border: 1px solid var(--line2); background: var(--surface); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; white-space: nowrap; text-decoration: none; display: inline-block; }
+.btn:hover:not(:disabled) { background: var(--surface2); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover:not(:disabled) { opacity: .88; background: var(--accent); }
+.btn.danger { color: var(--bad); border-color: var(--bad); background: transparent; }
+.btn.danger:hover:not(:disabled) { background: var(--bad-bg); }
+.btn.quiet { border-color: transparent; background: transparent; }
+.btn.quiet:hover:not(:disabled) { background: var(--surface2); }
+.btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+label { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 5px; }
+label .req { color: var(--bad); margin-left: 3px; }
+label .count { float: right; font: 400 11.5px/1.6 var(--f-t); color: var(--mute); }
+input[type=text], textarea, select { width: 100%; background: var(--surface); border: 1px solid var(--line2); border-radius: 6px; padding: 8px 10px; }
+textarea { min-height: 84px; resize: vertical; line-height: 1.5; }
+textarea.body { min-height: 52vh; font: 14px/1.65 var(--f-t); tab-size: 2; }
+.fhint { color: var(--mute); font-size: 12.5px; margin: 4px 0 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; align-items: center; }
+.err { background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad); border-radius: 6px; padding: 10px 12px; margin: 12px 0 0; white-space: pre-wrap; font-size: 14px; }
+.note { background: var(--warn-bg); color: var(--warn); border-radius: 6px; padding: 10px 12px; margin: 12px 0 0; font-size: 14px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; } @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+
+/* --- rows --- */
+.list { display: flex; flex-direction: column; gap: 8px; }
+.row { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); position: relative; }
+.row.hidden { background: transparent; border-style: dashed; }
+.row.hidden .title { color: var(--mute); }
+.row .head { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 8px; }
+.row .grip { border: 0; background: transparent; color: var(--mute); cursor: grab; padding: 6px 4px; font-size: 16px; letter-spacing: -2px; }
+.row .main { flex: 1; min-width: 0; }
+.row .title { font-weight: 600; overflow-wrap: anywhere; }
+.badge { font: 11px/1 var(--f-t); padding: 3px 6px; border-radius: 4px; background: var(--surface2); color: var(--mute); margin-left: 6px; vertical-align: middle; }
+.badge.draft { background: var(--warn-bg); color: var(--warn); }
+.row.dragging { opacity: .4; }
+.row.drop-before { box-shadow: 0 -3px 0 var(--focus); } .row.drop-after { box-shadow: 0 3px 0 var(--focus); }
+.row .body { padding: 0 14px 14px; border-top: 1px solid var(--line); }
+.row .confirm { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 14px; background: var(--bad-bg); color: var(--bad); border-top: 1px solid var(--bad); border-radius: 0 0 var(--r) var(--r); font-size: 14px; }
+details.menu { position: relative; }
+details.menu > summary { list-style: none; cursor: pointer; padding: 5px 10px; border-radius: 6px; font-size: 18px; line-height: 1; color: var(--mute); }
+details.menu > summary::-webkit-details-marker { display: none; }
+details.menu > summary:hover, details.menu[open] > summary { background: var(--surface2); }
+details.menu .pop { position: absolute; right: 0; top: 100%; z-index: 10; min-width: 190px; background: var(--surface); border: 1px solid var(--line2); border-radius: var(--r); box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 4px; display: flex; flex-direction: column; }
+details.menu .pop button { border: 0; background: transparent; text-align: left; padding: 8px 10px; border-radius: 5px; cursor: pointer; }
+details.menu .pop button:hover:not(:disabled) { background: var(--surface2); } details.menu .pop button:disabled { opacity: .4; cursor: not-allowed; }
+details.menu .pop .bad { color: var(--bad); }
+details.add { border: 1px dashed var(--line2); border-radius: var(--r); margin-top: 10px; background: transparent; }
+details.add[open] { background: var(--surface); border-style: solid; border-color: var(--line); }
+details.add > summary { cursor: pointer; padding: 11px 14px; font-weight: 600; list-style: none; }
+details.add > summary::-webkit-details-marker { display: none; }
 details.add > div { padding: 0 14px 14px; }
-.preview { border-left: 4px solid var(--ink); background: #1B1B1A; display: flex; flex-direction: column; min-width: 0; }
-.pbar { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: var(--ink); }
-.pbar .btn { background: transparent; color: #D9D9D3; border-color: #D9D9D3; } .pbar .btn[aria-pressed="true"] { background: #D9D9D3; color: var(--ink); }
-.pframe { flex: 1; display: flex; justify-content: center; background: #3A3A37; padding: 0; overflow: auto; }
-.pframe iframe { border: 0; background: #fff; width: 100%; height: 100%; min-height: 600px; }
-.pframe.phone iframe { width: 390px; max-width: 100%; border-left: 4px solid #1B1B1A; border-right: 4px solid #1B1B1A; }
-ul.plain { margin: 6px 0 0; padding: 0; list-style: none; } ul.plain li { margin: 2px 0; overflow-wrap: anywhere; }
-pre { background: var(--ink); color: #D9D9D3; padding: 12px; overflow: auto; font: 12px/1.5 var(--f-t); margin: 10px 0 0; white-space: pre-wrap; }
-.ok-t { color: var(--ok); } .bad-t { color: var(--bad); } .warn-t { color: var(--warn); }
-#toast { position: fixed; left: 20px; right: 20px; bottom: 20px; max-width: 640px; margin: 0 auto; z-index: 10; }
-#toast div { border: 4px solid var(--ink); padding: 12px 14px; background: var(--panel); font: 13px/1.4 var(--f-t); white-space: pre-wrap; display: flex; gap: 12px; align-items: flex-start; box-shadow: 6px 6px 0 var(--ink); }
-#toast div.err { background: #F1D5D5; border-color: var(--bad); }
-#toast button { margin-left: auto; }
-@media (prefers-reduced-motion: no-preference) { .card, .btn { transition: background-color .12s, color .12s, opacity .12s; } }
+.lanehead { background: var(--accent); color: var(--accent-ink); border-radius: var(--r); padding: 8px 8px 8px 14px; margin: 18px 0 8px; display: flex; align-items: center; gap: 8px; }
+.lanehead .meta { color: inherit; opacity: .7; }
+.lanehead .btn { background: transparent; color: inherit; border-color: color-mix(in srgb, currentColor 40%, transparent); }
+ul.checks { list-style: none; padding: 0; margin: 8px 0 0; } ul.checks li { padding: 4px 0; } .ok-t { color: var(--ok); } .bad-t { color: var(--bad); } .warn-t { color: var(--warn); }
+pre { background: var(--surface2); border-radius: var(--r); padding: 12px; overflow: auto; font: 12.5px/1.55 var(--f-t); margin: 12px 0 0; white-space: pre-wrap; }
+details.guide { margin-top: 10px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); } details.guide > summary { padding: 9px 12px; cursor: pointer; font-weight: 600; font-size: 14px; }
+details.guide table { border-collapse: collapse; margin: 0 12px 12px; font-size: 13.5px; width: calc(100% - 24px); } details.guide td { padding: 5px 12px 5px 0; vertical-align: top; border-top: 1px solid var(--line); } details.guide code { font: 12.5px var(--f-t); background: var(--surface2); padding: 1px 5px; border-radius: 4px; }
+.sticky { position: sticky; bottom: 0; background: linear-gradient(transparent, var(--bg) 28%); padding: 22px 0 14px; margin-top: 8px; }
+#toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; z-index: 40; width: min(640px, calc(100vw - 24px)); }
+#toast .t { display: flex; gap: 12px; align-items: center; background: var(--ink); color: var(--bg); padding: 11px 14px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.3); font-size: 14px; white-space: pre-wrap; }
+#toast .t.bad { background: var(--bad); color: #fff; }
+#toast .t span { flex: 1; } #toast .t .btn { background: transparent; color: inherit; border-color: color-mix(in srgb, currentColor 50%, transparent); padding: 3px 10px; }
+@media (prefers-reduced-motion: no-preference) { .btn, .row, .rail button { transition: background-color .12s, opacity .12s, box-shadow .12s; } }
 </style>
 </head>
 <body>
 <header class="top">
-  <h1>Beyondia manager</h1>
+  <span class="brand">Beyondia manager</span>
   <div class="chips" id="chips" aria-live="polite"></div>
+  <div class="space">
+    <span class="chip warn" id="dirty" hidden>● Unsaved typing</span>
+    <button class="btn" id="undo" disabled title="Undo the last change">↶ Undo</button>
+    <button class="btn" id="ptoggle" aria-pressed="true">Preview</button>
+  </div>
 </header>
-<div class="layout">
-  <main class="editor">
-    <div class="tabs" role="tablist" aria-label="Sections" id="tabs"></div>
-    <div id="panel" role="tabpanel"></div>
-  </main>
-  <aside class="preview" aria-label="Live preview">
+<div class="shell" id="shell">
+  <nav class="rail" id="rail" aria-label="Sections"></nav>
+  <main class="editor" id="panel"></main>
+  <aside class="preview" id="preview" aria-label="Live preview">
     <div class="pbar" id="pbar"></div>
-    <div class="pframe" id="pframe"><iframe id="frame" title="Site preview" src="/preview/index.html"></iframe></div>
+    <div class="pframe" id="pframe"><iframe id="frame" title="Site preview"></iframe></div>
   </aside>
 </div>
 <datalist id="statuses"></datalist>
@@ -89,28 +151,57 @@ pre { background: var(--ink); color: #D9D9D3; padding: 12px; overflow: auto; fon
 <script>
 "use strict";
 const TOKEN = "__BM_TOKEN__";
-const TABS = [["home", "Home"], ["doors", "Doors"], ["plans", "Plans"], ["github", "GitHub"], ["publish", "Publish"]];
-const PAGE_OF_TAB = { home: "index.html", doors: "index.html", plans: "plans.html", github: "github.html" };   // the preview follows the tab
+const TABS = [["home", "Home"], ["doors", "Doors"], ["stories", "Stories"], ["blog", "Blog"], ["plans", "Plans"], ["github", "GitHub"], ["publish", "Publish"]];
+const PAGE_OF_TAB = { home: "index.html", doors: "index.html", stories: "stories.html", blog: "blog.html", plans: "plans.html", github: "github.html" };
+const PREVIEW_PAGES = [["index.html", "Home"], ["stories.html", "Stories"], ["blog.html", "Blog"], ["plans.html", "Plans"], ["github.html", "GitHub"]];
 const STATUSES = ["Live", "In progress", "Planned", "Next", "Tomorrow", "Open", "Done", "Paused"];
-const ui = { tab: "home", editing: new Set(), confirming: null, publish: null, busy: false, previewPage: "index.html", phone: false, message: "" };
+const ui = {
+  tab: "home", open: new Set(), confirming: null, drafts: {}, dirty: new Set(), formError: {}, busy: false,
+  story: null,                       // null = the list; an id = editing that story; "+" = writing a new one
+  post: null,                        // the same for the blog
+  previewOpen: window.innerWidth >= 1180, previewPage: "index.html", phone: false, publish: null, message: "", focus: null,
+};
 let state = null;
 
-/* ---------- tiny DOM helper: text nodes only, never raw markup ---------- */
+/* ================= helpers ================= */
 function h(tag, props, ...kids) {
   const el = document.createElement(tag);
+  let value;
   for (const [k, v] of Object.entries(props || {})) {
     if (v === false || v == null) continue;
     if (k === "class") el.className = v;
     else if (k === "text") el.textContent = v;
+    else if (k === "value") value = v;
     else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
     else if (v === true) el.setAttribute(k, "");
     else el.setAttribute(k, v);
   }
-  for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  for (const kid of kids.flat(Infinity)) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  if (value !== undefined) el.value = value;
   return el;
 }
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const trim = (s, n) => (s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s);
+const csv = s => s.split(",").map(x => x.trim()).filter(Boolean);
+const slugify = t => t.toLowerCase().normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/[\s_]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+const todayLocal = () => { const d = new Date(), p = n => String(n).padStart(2, "0"); return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); };
+const wordsIn = t => (t.trim() ? t.trim().split(/\s+/).length : 0);
 
-/* ---------- talking to the server ---------- */
+const NAMES = { body: "Story text", paras: "Verse text", ref: "Verse number", visible: "Visibility", kids: "Rooms line", href: "Link", url: "GitHub link", stack: "Stack", aside: "Side note", when: "When" };
+/* Turn "  - home.map.tiles[0].title: must not be empty" into "Title (item 1): must not be empty". */
+function friendly(message) {
+  return message.replace("the change would make the config invalid:", "That cannot be saved:").split("\n").map(line => {
+    const m = line.match(/^\s*-\s*([\w.\[\]]+):\s*(.*)$/);
+    if (!m) return line;
+    const parts = m[1].split(".");
+    const raw = parts[parts.length - 1].replace(/\[\d+\]/g, "");
+    const last = (raw === "body" && m[1].startsWith("blog.")) ? "Post text" : (NAMES[raw] || raw.replace(/_/g, " "));
+    const idx = [...m[1].matchAll(/\[(\d+)\]/g)].map(x => Number(x[1]) + 1);
+    return "• " + cap(last) + (idx.length ? " (item " + idx.join(", ") + ")" : "") + ": " + m[2];
+  }).join("\n");
+}
+
+/* ================= server ================= */
 async function post(path, body) {
   const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", "X-BM-Token": TOKEN }, body: JSON.stringify(body || {}) });
   const data = await res.json().catch(() => ({ ok: false, error: "The server sent an unreadable answer." }));
@@ -118,364 +209,647 @@ async function post(path, body) {
   return data;
 }
 async function load() {
-  const res = await fetch("/api/state");
-  const data = await res.json();
+  const data = await (await fetch("/api/state")).json();
   if (!data.ok) throw new Error(data.error);
   state = data;
 }
-async function run(work, success) {
-  if (ui.busy) return;
-  ui.busy = true;
-  try {
-    const data = await work();
-    if (data && data.config !== undefined) state = data;
-    ui.busy = false;
-    render();
-    reloadPreview();
-    if (success) toast(success);
-    return data;
-  } catch (e) {
-    ui.busy = false;
-    render();
-    toast(e.message, true);
-  }
-}
-const edit = (op, params, success) => run(() => post("/api/edit", { op, params }), success);
-
-/* ---------- toast ---------- */
-function toast(text, isError) {
+function toast(text, opts = {}) {
   const box = document.getElementById("toast");
   box.replaceChildren();
-  const note = h("div", { class: isError ? "err" : "" }, h("span", { text }), h("button", { class: "btn", onclick: () => box.replaceChildren(), "aria-label": "Dismiss message", text: "OK" }));
+  const note = h("div", { class: "t" + (opts.bad ? " bad" : "") }, h("span", { text }),
+    opts.undo ? h("button", { class: "btn", onclick: () => { box.replaceChildren(); undo(); }, text: "Undo" }) : null,
+    h("button", { class: "btn", "aria-label": "Dismiss", onclick: () => box.replaceChildren(), text: "✕" }));
   box.append(note);
-  if (!isError) setTimeout(() => { if (note.parentNode === box) box.replaceChildren(); }, 3500);
+  if (!opts.bad) setTimeout(() => { if (note.parentNode === box) box.replaceChildren(); }, opts.undo ? 7000 : 3500);
 }
 
-/* ---------- form fields ---------- */
+/* One entry point for every change: typed text is kept on failure and cleared on success. */
+async function act(op, params, o = {}) {
+  if (ui.busy) return false;
+  ui.busy = true;
+  try {
+    state = await post("/api/edit", { op, params });
+    ui.busy = false;
+    if (o.clear) clearDrafts(o.clear);
+    if (o.form) { delete ui.formError[o.form]; if (o.closeForm !== false) ui.open.delete(o.form); }
+    render(); reloadPreview();
+    if (o.ok) toast(o.ok, { undo: true });
+    return true;
+  } catch (e) {
+    ui.busy = false;
+    const text = friendly(e.message);
+    if (o.form) { ui.formError[o.form] = text; render(); } else { render(); toast(text, { bad: true }); }
+    return false;
+  }
+}
+async function undo() {
+  if (ui.busy) return;
+  ui.busy = true;
+  try { state = await post("/api/undo", {}); ui.busy = false; render(); reloadPreview(); toast("Undone."); }
+  catch (e) { ui.busy = false; render(); toast(friendly(e.message), { bad: true }); }
+}
+
+/* ================= drafts: what you typed survives errors and tab changes ================= */
+function clearDrafts(prefix) {
+  for (const k of Object.keys(ui.drafts)) if (k === prefix || k.startsWith(prefix + ":")) { delete ui.drafts[k]; ui.dirty.delete(k); }
+  updateDirty();
+}
+function updateDirty() {
+  document.getElementById("dirty").hidden = ui.dirty.size === 0;
+  for (const [id, prefix] of [["story-dirty", "story:"], ["post-dirty", "post:"]]) {
+    const line = document.getElementById(id);
+    if (line) line.textContent = [...ui.dirty].some(k => k.startsWith(prefix)) ? "● Unsaved changes · Ctrl+S saves" : "No unsaved changes";
+  }
+}
+window.addEventListener("beforeunload", e => { if (ui.dirty.size) { e.preventDefault(); e.returnValue = ""; } });
+
 let uid = 0;
-function field(label, value, opts = {}) {
-  const id = "f" + (++uid);
-  const input = opts.area ? h("textarea", { id, maxlength: opts.max, placeholder: opts.placeholder }) : h("input", { id, type: "text", maxlength: opts.max, placeholder: opts.placeholder });
-  input.value = value == null ? "" : value;
-  if (opts.list) input.setAttribute("list", "statuses");
-  const count = opts.max ? h("span", { class: "count" }) : null;
-  const upd = () => { if (count) count.textContent = input.value.length + "/" + opts.max; };
-  input.addEventListener("input", upd); upd();
-  const wrap = h("div", {}, h("label", { for: id }, label, count), input, opts.hint ? h("p", { class: "hint", text: opts.hint, style: "margin:4px 0 0" }) : null);
-  return { el: wrap, input, get: () => input.value, reset: () => { input.value = ""; upd(); } };
+/* spec: {name, label, value, key, max, area, list, placeholder, hint, required, options, body, rows, onInput} */
+function field(spec) {
+  const id = "f" + (++uid), key = spec.key;
+  const original = spec.value == null ? "" : String(spec.value);
+  const start = key && ui.drafts[key] !== undefined ? ui.drafts[key] : original;
+  const common = { id, maxlength: spec.max, placeholder: spec.placeholder, "data-fkey": key };
+  let input;
+  if (spec.options) input = h("select", common, spec.options.map(([v, l]) => h("option", { value: v, text: l })));
+  else if (spec.area) input = h("textarea", { ...common, class: spec.body ? "body" : "", spellcheck: "true", rows: spec.rows });
+  else input = h("input", { ...common, type: spec.type || "text", list: spec.list ? "statuses" : null, autocomplete: "off" });
+  input.value = start;
+  const count = spec.max ? h("span", { class: "count" }) : null;
+  const refresh = () => { if (count) count.textContent = input.value.length + " / " + spec.max; };
+  const remember = () => {
+    if (key) { ui.drafts[key] = input.value; input.value !== original ? ui.dirty.add(key) : ui.dirty.delete(key); updateDirty(); }
+    refresh();
+    if (spec.onInput) spec.onInput(input.value);
+  };
+  input.addEventListener("input", remember);
+  input.addEventListener("change", remember);
+  refresh();
+  if (key && start !== original) ui.dirty.add(key);
+  const el = h("div", {}, h("label", { for: id }, spec.label, spec.required ? h("span", { class: "req", text: "*" }) : null, count), input,
+    spec.hint ? h("p", { class: "fhint", text: spec.hint }) : null);
+  return { el, input, name: spec.name, original, get: () => input.value, set: v => { input.value = v; remember(); } };
 }
-const changedOnly = (fields, original) => {
-  const out = {};
-  for (const [k, f] of Object.entries(fields)) if (f.get() !== (original[k] == null ? "" : original[k])) out[k] = f.get();
-  return out;
-};
+const collect = fields => Object.fromEntries(fields.map(f => [f.name, f.get()]));
+const changed = fields => Object.fromEntries(fields.filter(f => f.get() !== f.original).map(f => [f.name, f.get()]));
+const errorBox = key => (ui.formError[key] ? h("div", { class: "err", role: "alert", text: ui.formError[key] }) : null);
 
-/* ---------- status chips and preview ---------- */
+/* A form with a Save button for a fixed set of fields (Home, Plans, GitHub page text...). */
+function pageForm({ key, specs, op, ok, label }) {
+  const fields = specs.map(s => field({ ...s, key: key + ":" + s.name }));
+  const save = () => { const c = changed(fields); if (!Object.keys(c).length) return toast("Nothing changed."); act(op, c, { form: key, clear: key, ok, closeForm: false }); };
+  const box = h("div", { "data-saveform": "1" }, errorBox(key), fields.map(f => f.el), h("div", { class: "actions" }, h("button", { class: "btn primary", onclick: save, text: label })));
+  box._save = save;
+  return box;
+}
+
+/* An inline editor for one item: Save / Cancel, Enter saves, Esc closes. */
+function inlineEditor({ key, specs, onSave }) {
+  const fields = specs.map(s => field({ ...s, key: key + ":" + s.name }));
+  const save = () => { const c = changed(fields); if (!Object.keys(c).length) return toast("Nothing changed."); onSave(c, key); };
+  const close = () => { ui.open.delete(key); delete ui.formError[key]; clearDrafts(key); render(); };
+  const box = h("div", { class: "body", "data-saveform": "1" }, errorBox(key), fields.map(f => f.el),
+    h("div", { class: "actions" }, h("button", { class: "btn primary", onclick: save, text: "Save" }), h("button", { class: "btn", onclick: close, text: "Cancel" })));
+  box._save = save;
+  box.addEventListener("keydown", e => {
+    if (e.key === "Escape") { e.preventDefault(); close(); }
+    else if (e.key === "Enter" && e.target.tagName === "INPUT") { e.preventDefault(); save(); }
+  });
+  if (ui.focus === key) ui.focus = key + ":" + specs[0].name;   // focus the first field when the editor has just been opened
+  return box;
+}
+
+/* A collapsed "+ Add ..." form whose typing is kept if the server refuses it. */
+function addForm({ key, title, specs, onSubmit, disabledReason }) {
+  const fields = specs.map(s => field({ ...s, key: key + ":" + s.name }));
+  const submit = () => onSubmit(collect(fields), key);
+  const inner = h("div", { "data-saveform": "1" }, errorBox(key), disabledReason ? h("div", { class: "note", text: disabledReason }) : null, fields.map(f => f.el),
+    h("div", { class: "actions" }, h("button", { class: "btn primary", disabled: !!disabledReason, onclick: submit, text: "Add" })));
+  inner._save = submit;
+  const box = h("details", { class: "add", open: ui.open.has(key) }, h("summary", { text: "+ " + title }), inner);
+  box.addEventListener("toggle", () => {
+    box.open ? ui.open.add(key) : ui.open.delete(key);
+    if (box.open) { const f = box.querySelector("input,textarea"); if (f && !f.value) f.focus(); }
+  });
+  box.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.tagName === "INPUT") { e.preventDefault(); submit(); } });
+  return box;
+}
+
+/* ================= rows: an edit button, a menu for the rest, drag to reorder ================= */
+function menu(items) {
+  return h("details", { class: "menu" }, h("summary", { "aria-label": "More actions", title: "More actions", text: "⋯" }),
+    h("div", { class: "pop" }, items.filter(Boolean).map(i => h("button", { class: i.danger ? "bad" : "", disabled: i.disabled, onclick: i.onClick, text: i.label }))));
+}
+document.addEventListener("click", e => document.querySelectorAll("details.menu[open]").forEach(d => { if (!d.contains(e.target)) d.removeAttribute("open"); }));
+
+function row({ key, index, title, meta, hidden, badges, onEdit, editing, menuItems, editor, confirmText, onConfirm, primaryLabel, drag }) {
+  return h("div", { class: "row" + (hidden ? " hidden" : ""), "data-index": index, draggable: drag && !editing ? "true" : null },
+    h("div", { class: "head" },
+      drag ? h("span", { class: "grip", "aria-hidden": "true", title: "Drag to reorder", text: "⋮⋮" }) : null,
+      h("div", { class: "main" }, h("div", { class: "title" }, title, badges), h("div", { class: "meta", text: meta })),
+      onEdit ? h("button", { class: "btn", "aria-expanded": String(!!editing), onclick: onEdit, text: editing ? "Close" : (primaryLabel || "Edit") }) : null,
+      menu(menuItems)),
+    editing ? editor : null,
+    ui.confirming === key ? h("div", { class: "confirm" }, h("span", { text: confirmText }),
+      h("button", { class: "btn danger", onclick: onConfirm, text: "Yes, remove" }),
+      h("button", { class: "btn", onclick: () => { ui.confirming = null; render(); }, text: "Keep" })) : null);
+}
+function sortable(container, onMove) {
+  let from = null;
+  const mark = (card, cls) => { container.querySelectorAll(".drop-before,.drop-after").forEach(c => c.classList.remove("drop-before", "drop-after")); if (card) card.classList.add(cls); };
+  container.addEventListener("dragstart", e => { const c = e.target.closest("[data-index]"); if (!c) return; from = Number(c.dataset.index); c.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(from)); });
+  container.addEventListener("dragover", e => {
+    if (from === null) return; e.preventDefault();
+    const c = e.target.closest("[data-index]");
+    if (c && Number(c.dataset.index) !== from) { const r = c.getBoundingClientRect(); mark(c, e.clientY < r.top + r.height / 2 ? "drop-before" : "drop-after"); }
+  });
+  container.addEventListener("drop", e => {
+    if (from === null) return; e.preventDefault();
+    const c = e.target.closest("[data-index]"); if (!c) return;
+    const at = Number(c.dataset.index) + (c.classList.contains("drop-after") ? 1 : 0);
+    const to = at > from ? at - 1 : at, f = from;
+    from = null; mark(null);
+    if (to !== f) onMove(f, to + 1);
+  });
+  container.addEventListener("dragend", () => { from = null; mark(null); container.querySelectorAll(".dragging").forEach(c => c.classList.remove("dragging")); });
+}
+const moveItems = (idKey, op, items, i) => [
+  { label: "Move up", disabled: i === 0, onClick: () => act(op, { [idKey]: items[i].id, position: i }) },
+  { label: "Move down", disabled: i === items.length - 1, onClick: () => act(op, { [idKey]: items[i].id, position: i + 2 }) },
+];
+
+/* A whole list: rows, drag & drop, the inline editor and the add form. */
+function listOf({ kind, noun, items, describe, specs, ops, idKey, addTitle, addSpecs, addBuild, addKey, empty, extraEdit, fixUpdate }) {
+  const list = h("div", { class: "list" });
+  items.forEach((item, i) => {
+    const key = kind + ":" + item.id, d = describe(item, i), editing = ui.open.has(key);
+    const editor = editing ? h("div", {}, inlineEditor({
+      key, specs: specs(item),
+      onSave: (c, k) => act(ops.update, { [idKey]: item.id, ...(fixUpdate ? fixUpdate(c) : c) }, { form: k, clear: k, ok: cap(noun) + " saved." }),
+    }), extraEdit ? extraEdit(item) : null) : null;
+    const canHide = "visible" in item;
+    list.append(row({
+      key, index: i, title: d.title, meta: d.meta, hidden: canHide && !item.visible, drag: true,
+      badges: [canHide && !item.visible ? h("span", { class: "badge draft", text: "hidden" }) : null],
+      editing, editor, onEdit: () => { editing ? ui.open.delete(key) : (ui.open.add(key), ui.focus = key); render(); },
+      menuItems: [...moveItems(idKey, ops.move, items, i),
+        canHide ? { label: item.visible ? "Hide" : "Show", onClick: () => act(ops.visible, { [idKey]: item.id, visible: !item.visible }, { ok: item.visible ? "Hidden." : "Visible again." }) } : null,
+        { label: "Remove…", danger: true, onClick: () => { ui.confirming = key; render(); } }],
+      confirmText: "Remove “" + trim(d.title.replace(/^\d+\.\s*/, ""), 50) + "”? (Undo works right afterwards.)",
+      onConfirm: () => { ui.confirming = null; act(ops.remove, { [idKey]: item.id }, { ok: cap(noun) + " removed." }); },
+    }));
+  });
+  sortable(list, (from, to) => act(ops.move, { [idKey]: items[from].id, position: to }));
+  const form = addForm({ key: addKey || kind + ":+", title: addTitle, specs: addSpecs, onSubmit: (values, k) => act(addBuild.op, addBuild.params(values), { form: k, clear: k, ok: cap(noun) + " added." }) });
+  return [items.length ? list : h("div", { class: "empty", text: empty }), form];
+}
+
+/* ================= chrome ================= */
 function renderChips() {
   const chips = document.getElementById("chips");
   chips.replaceChildren();
-  const s = state.status;
-  const add = (text, kind) => chips.append(h("span", { class: "chip " + kind, text }));
+  const s = state.status, add = (t, k) => chips.append(h("span", { class: "chip " + k, text: t }));
   add(s.valid ? "Config valid" : "Config invalid", s.valid ? "ok" : "bad");
   if (s.valid) {
     add(s.stale.length ? "Pages out of date" : "Pages built", s.stale.length ? "warn" : "ok");
     add(s.site_problems.length ? s.site_problems.length + " site problem(s)" : "Site checks pass", s.site_problems.length ? "bad" : "ok");
-    if (!s.git) add("Not a git repo", "warn");
-    else add(s.git.changed.length ? s.git.changed.length + " unpublished" : "Published", s.git.changed.length ? "warn" : "ok");
+    if (!s.git) add("Not a git repo", "warn"); else add(s.git.changed.length ? s.git.changed.length + " unpublished" : "Published", s.git.changed.length ? "warn" : "ok");
   }
+  document.getElementById("undo").disabled = !state.undo;
 }
+function renderRail() {
+  const c = state.config;
+  const counts = c ? { doors: c.home.map.tiles.length, stories: c.stories.items.length, blog: c.blog.items.length, plans: c.plans.lanes.reduce((n, l) => n + l.items.length, 0), github: c.github.repos.length } : {};
+  document.getElementById("rail").replaceChildren(...TABS.map(([id, label]) =>
+    h("button", { "aria-current": ui.tab === id ? "page" : null, onclick: () => goTab(id) }, label, counts[id] != null ? h("span", { class: "n", text: counts[id] }) : null)));
+}
+function goTab(id) {
+  if (ui.story && ui.tab === "stories" && id !== "stories" && !confirmLeave("story")) return;
+  if (ui.post && ui.tab === "blog" && id !== "blog" && !confirmLeave("post")) return;
+  if (id !== "stories") ui.story = null;
+  if (id !== "blog") ui.post = null;
+  ui.tab = id; ui.confirming = null;
+  if (PAGE_OF_TAB[id]) setPreview(PAGE_OF_TAB[id]);
+  render();
+}
+function setPreview(page) { if (page !== ui.previewPage) { ui.previewPage = page; renderPreviewBar(); reloadPreview(); } }
 function renderPreviewBar() {
-  const bar = document.getElementById("pbar");
-  bar.replaceChildren();
-  for (const [file, label] of [["index.html", "Home"], ["plans.html", "Plans"], ["github.html", "GitHub"]])
-    bar.append(h("button", { class: "btn", "aria-pressed": String(ui.previewPage === file), onclick: () => { ui.previewPage = file; renderPreviewBar(); reloadPreview(true); }, text: label }));
-  bar.append(h("button", { class: "btn", "aria-pressed": String(ui.phone), onclick: () => { ui.phone = !ui.phone; document.getElementById("pframe").classList.toggle("phone", ui.phone); renderPreviewBar(); }, text: "Phone width" }));
-  bar.append(h("button", { class: "btn", onclick: () => reloadPreview(true), text: "Reload" }));
+  document.getElementById("pbar").replaceChildren(
+    ...PREVIEW_PAGES.map(([f, l]) => h("button", { class: "btn quiet", "aria-pressed": String(ui.previewPage === f), onclick: () => { ui.previewPage = f; renderPreviewBar(); reloadPreview(); }, text: l })),
+    h("button", { class: "btn quiet", "aria-pressed": String(ui.phone), onclick: () => { ui.phone = !ui.phone; document.getElementById("pframe").classList.toggle("phone", ui.phone); renderPreviewBar(); }, text: "Phone" }),
+    h("button", { class: "btn quiet", onclick: () => reloadPreview(), text: "Reload" }),
+    h("a", { class: "btn quiet", href: "/preview/" + ui.previewPage, target: "_blank", rel: "noopener", text: "Open ↗" }));
 }
-function reloadPreview() {
-  document.getElementById("frame").src = "/preview/" + ui.previewPage + "?t=" + Date.now();
+function reloadPreview() { if (ui.previewOpen) document.getElementById("frame").src = "/preview/" + ui.previewPage + "?t=" + Date.now(); }
+function applyPreviewVisibility() {
+  document.getElementById("preview").hidden = !ui.previewOpen;
+  document.getElementById("shell").classList.toggle("nopreview", !ui.previewOpen);
+  document.getElementById("ptoggle").setAttribute("aria-pressed", String(ui.previewOpen));
+  reloadPreview();
 }
 
-/* ---------- Home tab ---------- */
+/* ================= Home ================= */
 function renderHome() {
   const home = state.config.home;
-  const fields = {
-    kicker: field("Kicker", home.kicker, { max: 40 }),
-    title: field("Title", home.title, { max: 40 }),
-    lead: field("Lead", home.lead, { max: 240, area: true }),
-    map_kicker: field("Map kicker", home.map.kicker, { max: 40 }),
-    map_title: field("Map title", home.map.title, { max: 80, hint: "{count} becomes the number of visible doors, in words." }),
-    map_intro: field("Map intro", home.map.intro, { max: 240, area: true }),
-  };
-  const original = { kicker: home.kicker, title: home.title, lead: home.lead, map_kicker: home.map.kicker, map_title: home.map.title, map_intro: home.map.intro };
-  const save = h("button", { class: "btn primary", onclick: () => {
-    const changed = changedOnly(fields, original);
-    if (!Object.keys(changed).length) return toast("Nothing changed.");
-    edit("home.set", changed, "Home page saved.");
-  }, text: "Save home page" });
-
-  const buttons = home.buttons.map((b, i) => h("div", { class: "card" }, h("div", { class: "row" },
-    h("div", { class: "grow" }, h("div", { class: "name" }, b.label, h("span", { class: "badge", text: b.style })), h("div", { class: "meta", text: b.href })),
-    h("button", { class: "btn danger", disabled: home.buttons.length <= 1, onclick: () => edit("button.remove", { position: i + 1 }, "Button removed."), text: "Remove" }))));
-  const bl = field("Label", "", { max: 40 }), bh = field("Link", "", { placeholder: "ideology.html or https://…" });
-  const bs = h("select", { id: "bstyle" }, h("option", { value: "ghost", text: "ghost (outlined)" }), h("option", { value: "solid", text: "solid (filled)" }));
-  const addButton = h("details", { class: "add" }, h("summary", { text: "+ Add a button" }), h("div", {}, bl.el, bh.el, h("label", { for: "bstyle", text: "Style" }), bs,
-    h("div", { class: "actions" }, h("button", { class: "btn primary", disabled: home.buttons.length >= 3, onclick: () => edit("button.add", { label: bl.get(), href: bh.get(), style: bs.value }, "Button added."), text: "Add button" })),
-    home.buttons.length >= 3 ? h("p", { class: "hint", text: "At most 3 buttons." }) : null));
-
-  const ticker = home.ticker.map((t, i) => h("div", { class: "card" }, h("div", { class: "row" },
-    h("div", { class: "grow name", text: t }),
-    h("button", { class: "btn danger", disabled: home.ticker.length <= 1, onclick: () => edit("ticker.remove", { position: i + 1 }, "Phrase removed."), text: "Remove" }))));
-  const tt = field("Phrase", "", { max: 60 });
-  const addTicker = h("details", { class: "add" }, h("summary", { text: "+ Add a phrase" }), h("div", {}, tt.el,
-    h("div", { class: "actions" }, h("button", { class: "btn primary", disabled: home.ticker.length >= 12, onclick: () => edit("ticker.add", { text: tt.get() }, "Phrase added."), text: "Add phrase" }))));
-
-  return [
-    h("h2", { text: "Home page" }), h("p", { class: "hint", text: "The headline block and the map heading. Changes rebuild the page at once." }),
-    ...Object.values(fields).map(f => f.el), h("div", { class: "actions" }, save),
-    h("h3", { text: "Buttons (1–3)" }), ...buttons, addButton,
-    h("h3", { text: "Moving strip (1–12)" }), ...ticker, addTicker,
-  ];
+  const form = pageForm({ key: "home", op: "home.set", ok: "Home page saved.", label: "Save home page", specs: [
+    { name: "kicker", label: "Kicker", value: home.kicker, max: 40 }, { name: "title", label: "Title", value: home.title, max: 40 },
+    { name: "lead", label: "Lead", value: home.lead, max: 240, area: true, rows: 3 }, { name: "map_kicker", label: "Map kicker", value: home.map.kicker, max: 40 },
+    { name: "map_title", label: "Map title", value: home.map.title, max: 80, hint: "{count} becomes the number of visible doors, in words." },
+    { name: "map_intro", label: "Map intro", value: home.map.intro, max: 240, area: true, rows: 3 }] });
+  const buttons = h("div", { class: "list" }, home.buttons.map((b, i) => row({
+    key: "button:" + i, index: i, title: b.label, meta: b.href + " · " + (b.style === "solid" ? "filled" : "outlined"),
+    menuItems: [{ label: "Remove", danger: true, disabled: home.buttons.length <= 1, onClick: () => act("button.remove", { position: i + 1 }, { ok: "Button removed." }) }] })));
+  const ticker = h("div", { class: "list" }, home.ticker.map((t, i) => row({
+    key: "ticker:" + i, index: i, title: t, meta: "phrase " + (i + 1),
+    menuItems: [{ label: "Remove", danger: true, disabled: home.ticker.length <= 1, onClick: () => act("ticker.remove", { position: i + 1 }, { ok: "Phrase removed." }) }] })));
+  return [h("h2", { text: "Home page" }), h("p", { class: "hint", text: "The headline block and the map heading. Saving rebuilds the page and the preview." }), form,
+    h("h3", { text: "Buttons under the headline (1–3)" }), buttons,
+    addForm({ key: "button:+", title: "Add a button", disabledReason: home.buttons.length >= 3 ? "There can be at most 3 buttons." : null,
+      specs: [{ name: "label", label: "Label", max: 40, required: true }, { name: "href", label: "Link", placeholder: "ideology.html or https://…", required: true },
+        { name: "style", label: "Style", options: [["ghost", "Outlined"], ["solid", "Filled"]], value: "ghost" }],
+      onSubmit: (v, k) => act("button.add", v, { form: k, clear: k, ok: "Button added." }) }),
+    h("h3", { text: "Moving strip (1–12)" }), ticker,
+    addForm({ key: "ticker:+", title: "Add a phrase", disabledReason: home.ticker.length >= 12 ? "There can be at most 12 phrases." : null,
+      specs: [{ name: "text", label: "Phrase", max: 60, required: true }], onSubmit: (v, k) => act("ticker.add", { text: v.text }, { form: k, clear: k, ok: "Phrase added." }) })];
 }
 
-/* ---------- generic list of movable, hideable, editable items ---------- */
-function itemList({ items, kind, summary, editFields, ops, extra }) {
-  return items.map((item, i) => {
-    const key = kind + ":" + item.id;
-    const editing = ui.editing.has(key);
-    const card = h("div", { class: "card" + (item.visible ? "" : " hidden") });
-    card.append(h("div", { class: "row" },
-      h("div", { class: "grow" }, h("div", { class: "name" }, summary(item).title, item.visible ? null : h("span", { class: "badge", text: "hidden" })), h("div", { class: "meta", text: summary(item).meta })),
-      h("button", { class: "btn", disabled: i === 0, "aria-label": "Move up", onclick: () => edit(ops.move, { [ops.idKey]: item.id, position: i }), text: "↑" }),
-      h("button", { class: "btn", disabled: i === items.length - 1, "aria-label": "Move down", onclick: () => edit(ops.move, { [ops.idKey]: item.id, position: i + 2 }), text: "↓" }),
-      h("button", { class: "btn", onclick: () => edit(ops.visible, { [ops.idKey]: item.id, visible: !item.visible }, item.visible ? "Hidden." : "Visible again."), text: item.visible ? "Hide" : "Show" }),
-      h("button", { class: "btn", "aria-expanded": String(editing), onclick: () => { editing ? ui.editing.delete(key) : ui.editing.add(key); render(); }, text: editing ? "Close" : "Edit" }),
-      ui.confirming === key
-        ? h("button", { class: "btn danger", onclick: () => { ui.confirming = null; edit(ops.remove, { [ops.idKey]: item.id }, "Removed."); }, text: "Really remove?" })
-        : h("button", { class: "btn danger", onclick: () => { ui.confirming = key; render(); }, text: "Remove" })));
-    if (editing) {
-      const fields = editFields(item);
-      const original = {};
-      for (const [k, f] of Object.entries(fields)) original[k] = f.original;
-      card.append(...Object.values(fields).map(f => f.el), ...(extra ? extra(item) : []), h("div", { class: "actions" },
-        h("button", { class: "btn primary", onclick: () => {
-          const changed = changedOnly(fields, original);
-          if (!Object.keys(changed).length) return toast("Nothing changed.");
-          if (changed.stack !== undefined) changed.stack = changed.stack.split(",").map(s => s.trim()).filter(Boolean);
-          edit(ops.update, { [ops.idKey]: item.id, ...changed }, "Saved.");
-        }, text: "Save" })));
-    }
-    return card;
-  });
-}
-const withOriginal = (f, original) => { f.original = original == null ? "" : original; return f; };
-
-/* ---------- Doors tab ---------- */
+/* ================= Doors ================= */
 function renderDoors() {
-  const tiles = state.config.home.map.tiles;
-  const list = itemList({
-    items: tiles, kind: "tile",
-    summary: t => ({ title: (tiles.indexOf(t) + 1) + ". " + t.title, meta: t.id + "  →  " + t.href }),
-    editFields: t => ({
-      label: withOriginal(field("Label", t.label, { max: 40 }), t.label),
-      title: withOriginal(field("Title", t.title, { max: 80 }), t.title),
-      text: withOriginal(field("Text", t.text, { max: 240, area: true }), t.text),
-      kids: withOriginal(field("Rooms line (optional)", t.kids, { max: 120 }), t.kids),
-      href: withOriginal(field("Link", t.href, { placeholder: "page.html" }), t.href),
-    }),
-    ops: { move: "tile.move", visible: "tile.visible", remove: "tile.remove", update: "tile.update", idKey: "tile_id" },
-  });
-  const f = {
-    id: field("Id (a-z, 0-9, hyphens)", "", { max: 40, placeholder: "blog" }), label: field("Label", "", { max: 40 }), title: field("Title", "", { max: 80 }),
-    text: field("Text", "", { max: 240, area: true }), kids: field("Rooms line (optional)", "", { max: 120 }), href: field("Link", "", { placeholder: "stories.html" }),
-  };
-  const add = h("details", { class: "add" }, h("summary", { text: "+ Add a door" }), h("div", {}, ...Object.values(f).map(x => x.el),
-    h("div", { class: "actions" }, h("button", { class: "btn primary", onclick: () => edit("tile.add", Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.get()])), "Door added."), text: "Add door" }))));
-  const visible = tiles.filter(t => t.visible).length;
-  return [h("h2", { text: "Doors" }), h("p", { class: "hint", text: visible + " visible of " + tiles.length + ". The home page says “" + state.config.home.map.title.replace("{count}", String(visible)) + "”. Order here is the order on the page." }), ...list, add];
+  const tiles = state.config.home.map.tiles, visible = tiles.filter(t => t.visible).length;
+  const title = state.config.home.map.title.replace("{count}", String(visible));
+  return [h("h2", { text: "Doors" }),
+    h("p", { class: "hint", text: visible + " visible of " + tiles.length + ". The home page says “" + title + "”. Drag rows, or use ⋯, to change the order." }),
+    ...listOf({
+      kind: "tile", noun: "door", items: tiles, idKey: "tile_id", empty: "No doors yet.",
+      ops: { move: "tile.move", visible: "tile.visible", remove: "tile.remove", update: "tile.update" },
+      describe: (t, i) => ({ title: (i + 1) + ". " + t.title, meta: t.id + " → " + t.href }),
+      specs: t => [{ name: "label", label: "Label", value: t.label, max: 40 }, { name: "title", label: "Title", value: t.title, max: 80 },
+        { name: "text", label: "Text", value: t.text, max: 240, area: true, rows: 2, hint: "{Stories} or {stories} becomes the number of published stories." },
+        { name: "kids", label: "Rooms line (optional)", value: t.kids, max: 120 }, { name: "href", label: "Link", value: t.href, placeholder: "page.html" }],
+      addTitle: "Add a door",
+      addSpecs: [{ name: "id", label: "Id", max: 40, placeholder: "blog", hint: "Lower-case letters, digits and hyphens. Cannot be changed later.", required: true },
+        { name: "label", label: "Label", max: 40, required: true }, { name: "title", label: "Title", max: 80, required: true },
+        { name: "text", label: "Text", max: 240, area: true, rows: 2, required: true }, { name: "kids", label: "Rooms line (optional)", max: 120 },
+        { name: "href", label: "Link", placeholder: "stories.html", required: true }],
+      addBuild: { op: "tile.add", params: v => v },
+    })];
 }
 
-
-/* ---------- Plans tab ---------- */
+/* ================= Plans ================= */
 function renderPlans() {
   const plans = state.config.plans, road = plans.roadmap;
-  const fields = {
-    title: field("Page title", plans.title, { max: 80 }), lead: field("Lead", plans.lead, { max: 240, area: true }),
-    roadmap_kicker: field("Roadmap kicker", road.kicker, { max: 40 }), roadmap_title: field("Roadmap title", road.title, { max: 80 }),
-    roadmap_intro: field("Roadmap intro", road.intro, { max: 240, area: true }),
-  };
-  const original = { title: plans.title, lead: plans.lead, roadmap_kicker: road.kicker, roadmap_title: road.title, roadmap_intro: road.intro };
-  const save = h("button", { class: "btn primary", onclick: () => {
-    const changed = changedOnly(fields, original);
-    if (!Object.keys(changed).length) return toast("Nothing changed.");
-    edit("plans.set", changed, "Plans page saved.");
-  }, text: "Save page text" });
-
-  const out = [h("h2", { text: "Plans page" }), h("p", { class: "hint", text: "Three lanes of plans, and below them the roadmap: what comes next, in order." }),
-    ...Object.values(fields).map(f => f.el), h("div", { class: "actions" }, save)];
-
-  /* lanes */
-  out.push(h("h3", { text: "Lanes (1–3)" }));
+  const out = [h("h2", { text: "Plans page" }), h("p", { class: "hint", text: "Up to three lanes of plans, and the roadmap below them." }),
+    pageForm({ key: "plans", op: "plans.set", ok: "Plans page saved.", label: "Save page text", specs: [
+      { name: "title", label: "Page title", value: plans.title, max: 80 }, { name: "lead", label: "Lead", value: plans.lead, max: 240, area: true, rows: 3 },
+      { name: "roadmap_kicker", label: "Roadmap kicker", value: road.kicker, max: 40 }, { name: "roadmap_title", label: "Roadmap title", value: road.title, max: 80 },
+      { name: "roadmap_intro", label: "Roadmap intro", value: road.intro, max: 240, area: true, rows: 3 }] }),
+    h("h3", { text: "Lanes and plans" })];
   plans.lanes.forEach((lane, li) => {
-    const lkey = "lane:" + lane.id;
-    const editing = ui.editing.has(lkey);
-    const head = h("div", { class: "card", style: "background: var(--ink); color: #D9D9D3; border-color: var(--ink)" }, h("div", { class: "row" },
-      h("div", { class: "grow" }, h("div", { class: "name" }, lane.label), h("div", { class: "meta", style: "color:#B5B5AE", text: lane.id + " · " + lane.items.length + " plan(s)" })),
-      h("button", { class: "btn", disabled: li === 0, "aria-label": "Move lane left", onclick: () => edit("lane.move", { lane_id: lane.id, position: li }), text: "←" }),
-      h("button", { class: "btn", disabled: li === plans.lanes.length - 1, "aria-label": "Move lane right", onclick: () => edit("lane.move", { lane_id: lane.id, position: li + 2 }), text: "→" }),
-      h("button", { class: "btn", onclick: () => { editing ? ui.editing.delete(lkey) : ui.editing.add(lkey); render(); }, text: editing ? "Close" : "Rename" }),
-      ui.confirming === lkey
-        ? h("button", { class: "btn danger", onclick: () => { ui.confirming = null; edit("lane.remove", { lane_id: lane.id }, "Lane removed."); }, text: "Really remove?" })
-        : h("button", { class: "btn danger", disabled: plans.lanes.length <= 1, onclick: () => { ui.confirming = lkey; render(); }, text: "Remove" })));
-    if (editing) {
-      const lf = field("Lane label", lane.label, { max: 40 });
-      head.append(lf.el, h("div", { class: "actions" }, h("button", { class: "btn", onclick: () => lf.get() === lane.label ? toast("Nothing changed.") : edit("lane.update", { lane_id: lane.id, label: lf.get() }, "Lane renamed."), text: "Save" })));
-    }
-    if (lane.items.length && ui.confirming === lkey) head.append(h("p", { class: "hint", style: "color:#E5C65A;margin:8px 0 0", text: "A lane with plans cannot be removed. Move or remove its plans first." }));
-    out.push(head);
-
-    out.push(...itemList({
-      items: lane.items, kind: "plan",
-      summary: p => ({ title: p.title, meta: p.id + "  ·  " + p.status }),
-      editFields: p => ({
-        title: withOriginal(field("Title", p.title, { max: 80 }), p.title),
-        text: withOriginal(field("Text", p.text, { max: 240, area: true }), p.text),
-        status: withOriginal(field("Status", p.status, { max: 24, list: true }), p.status),
-      }),
-      extra: p => {
-        const sel = h("select", { id: "lane-" + p.id, "aria-label": "Move to lane" }, ...plans.lanes.map(l => h("option", { value: l.id, selected: l.id === lane.id, text: l.label })));
-        sel.addEventListener("change", () => edit("plan.relane", { plan_id: p.id, lane_id: sel.value }, "Moved to another lane."));
-        return [h("label", { for: "lane-" + p.id, text: "Move to lane" }), sel];
-      },
-      ops: { move: "plan.move", visible: "plan.visible", remove: "plan.remove", update: "plan.update", idKey: "plan_id" },
+    const lkey = "lane:" + lane.id, renaming = ui.open.has(lkey);
+    out.push(h("div", { class: "lanehead" }, h("div", { style: "flex:1" }, h("strong", { text: lane.label }), " ", h("span", { class: "meta", text: lane.id + " · " + lane.items.length + " plan(s)" })),
+      h("button", { class: "btn", disabled: li === 0, "aria-label": "Move lane up", onclick: () => act("lane.move", { lane_id: lane.id, position: li }), text: "↑" }),
+      h("button", { class: "btn", disabled: li === plans.lanes.length - 1, "aria-label": "Move lane down", onclick: () => act("lane.move", { lane_id: lane.id, position: li + 2 }), text: "↓" }),
+      h("button", { class: "btn", onclick: () => { renaming ? ui.open.delete(lkey) : (ui.open.add(lkey), ui.focus = lkey); render(); }, text: renaming ? "Close" : "Rename" }),
+      h("button", { class: "btn", disabled: plans.lanes.length <= 1 || lane.items.length > 0, title: lane.items.length ? "Move or remove its plans first" : "Remove this lane",
+        onclick: () => act("lane.remove", { lane_id: lane.id }, { ok: "Lane removed." }), text: "Remove" })));
+    if (renaming) out.push(h("div", { class: "row" }, inlineEditor({ key: lkey, specs: [{ name: "label", label: "Lane label", value: lane.label, max: 40 }],
+      onSave: (c, k) => act("lane.update", { lane_id: lane.id, ...c }, { form: k, clear: k, ok: "Lane renamed." }) })));
+    out.push(...listOf({
+      kind: "plan", noun: "plan", items: lane.items, idKey: "plan_id", empty: "No plans in this lane yet.", addKey: "plan:+:" + lane.id,
+      ops: { move: "plan.move", visible: "plan.visible", remove: "plan.remove", update: "plan.update" },
+      describe: p => ({ title: p.title, meta: p.id + " · " + p.status }),
+      specs: p => [{ name: "title", label: "Title", value: p.title, max: 80 }, { name: "text", label: "Text", value: p.text, max: 240, area: true, rows: 2 },
+        { name: "status", label: "Status", value: p.status, max: 24, list: true }],
+      extraEdit: p => h("div", { class: "body" }, h("label", { for: "ln-" + p.id, text: "Move to another lane" }),
+        h("select", { id: "ln-" + p.id, value: lane.id, onchange: e => act("plan.relane", { plan_id: p.id, lane_id: e.target.value }, { ok: "Moved to another lane." }) },
+          plans.lanes.map(l => h("option", { value: l.id, text: l.label })))),
+      addTitle: "Add a plan to “" + lane.label + "”",
+      addSpecs: [{ name: "id", label: "Id", max: 40, placeholder: "new-plan", required: true, hint: "Unique across all lanes." }, { name: "title", label: "Title", max: 80, required: true },
+        { name: "text", label: "Text", max: 240, area: true, rows: 2, required: true }, { name: "status", label: "Status", max: 24, list: true, value: "In progress", required: true }],
+      addBuild: { op: "plan.add", params: v => ({ lane_id: lane.id, ...v }) },
     }));
-    if (!lane.items.length) out.push(h("p", { class: "hint", text: "No plans in this lane yet." }));
-
-    const f = { id: field("Id (a-z, 0-9, hyphens)", "", { max: 40, placeholder: "new-plan" }), title: field("Title", "", { max: 80 }), text: field("Text", "", { max: 240, area: true }), status: field("Status", "In progress", { max: 24, list: true }) };
-    out.push(h("details", { class: "add" }, h("summary", { text: "+ Add a plan to " + lane.label }), h("div", {}, ...Object.values(f).map(x => x.el),
-      h("div", { class: "actions" }, h("button", { class: "btn primary", onclick: () => edit("plan.add", { lane_id: lane.id, ...Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.get()])) }, "Plan added."), text: "Add plan" })))));
   });
-  const lid = field("Id (a-z, 0-9, hyphens)", "", { max: 40, placeholder: "ideas" }), llabel = field("Label", "", { max: 40 });
-  out.push(h("details", { class: "add" }, h("summary", { text: "+ Add a lane" }), h("div", {}, lid.el, llabel.el,
-    h("div", { class: "actions" }, h("button", { class: "btn primary", disabled: plans.lanes.length >= 3, onclick: () => edit("lane.add", { id: lid.get(), label: llabel.get() }, "Lane added."), text: "Add lane" })),
-    plans.lanes.length >= 3 ? h("p", { class: "hint", text: "At most 3 lanes: the page lays them out in three columns." }) : null)));
-
-  /* roadmap */
-  out.push(h("h3", { text: "Roadmap steps" }));
-  const steps = itemList({
-    items: road.steps, kind: "step",
-    summary: st => ({ title: (road.steps.indexOf(st) + 1) + ". " + st.when + ": " + st.title, meta: st.id + "  ·  " + st.status }),
-    editFields: st => ({
-      when: withOriginal(field("When", st.when, { max: 30, placeholder: "Tomorrow, Autumn, 2027…" }), st.when),
-      title: withOriginal(field("Title", st.title, { max: 80 }), st.title),
-      text: withOriginal(field("Text", st.text, { max: 240, area: true }), st.text),
-      status: withOriginal(field("Status", st.status, { max: 24, list: true }), st.status),
-    }),
-    ops: { move: "step.move", visible: "step.visible", remove: "step.remove", update: "step.update", idKey: "step_id" },
-  });
-  out.push(...(steps.length ? steps : [h("p", { class: "hint", text: "No steps yet." })]));
-  const sf = { id: field("Id (a-z, 0-9, hyphens)", "", { max: 40, placeholder: "next-step" }), when: field("When", "", { max: 30, placeholder: "Tomorrow, Autumn, 2027…" }), title: field("Title", "", { max: 80 }), text: field("Text", "", { max: 240, area: true }), status: field("Status", "Planned", { max: 24, list: true }) };
-  out.push(h("details", { class: "add" }, h("summary", { text: "+ Add a roadmap step" }), h("div", {}, ...Object.values(sf).map(x => x.el),
-    h("div", { class: "actions" }, h("button", { class: "btn primary", onclick: () => edit("step.add", Object.fromEntries(Object.entries(sf).map(([k, v]) => [k, v.get()])), "Step added."), text: "Add step" })))));
+  out.push(addForm({ key: "lane:+", title: "Add a lane", disabledReason: plans.lanes.length >= 3 ? "At most 3 lanes: the page shows them in three columns." : null,
+    specs: [{ name: "id", label: "Id", max: 40, placeholder: "ideas", required: true }, { name: "label", label: "Label", max: 40, required: true }],
+    onSubmit: (v, k) => act("lane.add", v, { form: k, clear: k, ok: "Lane added." }) }));
+  out.push(h("h3", { text: "Roadmap steps" }), ...listOf({
+    kind: "step", noun: "step", items: road.steps, idKey: "step_id", empty: "No steps yet.",
+    ops: { move: "step.move", visible: "step.visible", remove: "step.remove", update: "step.update" },
+    describe: (s, i) => ({ title: (i + 1) + ". " + s.when + ": " + s.title, meta: s.id + " · " + s.status }),
+    specs: s => [{ name: "when", label: "When", value: s.when, max: 30, placeholder: "Tomorrow, Autumn, 2027…" }, { name: "title", label: "Title", value: s.title, max: 80 },
+      { name: "text", label: "Text", value: s.text, max: 240, area: true, rows: 2 }, { name: "status", label: "Status", value: s.status, max: 24, list: true }],
+    addTitle: "Add a roadmap step",
+    addSpecs: [{ name: "id", label: "Id", max: 40, placeholder: "next-step", required: true }, { name: "when", label: "When", max: 30, placeholder: "Tomorrow, Autumn, 2027…", required: true },
+      { name: "title", label: "Title", max: 80, required: true }, { name: "text", label: "Text", max: 240, area: true, rows: 2, required: true },
+      { name: "status", label: "Status", max: 24, list: true, value: "Planned", required: true }],
+    addBuild: { op: "step.add", params: v => v },
+  }));
   return out;
 }
 
-/* ---------- GitHub tab ---------- */
+/* ================= GitHub ================= */
 function renderGithub() {
   const gh = state.config.github;
-  const fields = { title: field("Page title", gh.title, { max: 80 }), lead: field("Lead", gh.lead, { max: 240, area: true }) };
-  const original = { title: gh.title, lead: gh.lead };
-  const save = h("button", { class: "btn primary", onclick: () => {
-    const changed = changedOnly(fields, original);
-    if (!Object.keys(changed).length) return toast("Nothing changed.");
-    edit("github.set", changed, "GitHub page saved.");
-  }, text: "Save page text" });
-
-  const repos = gh.repos;
-  const list = itemList({
-    items: repos, kind: "repo",
-    summary: r => ({ title: r.name, meta: r.url + (r.stack.length ? "  ·  " + r.stack.join(", ") : "") }),
-    editFields: r => ({
-      name: withOriginal(field("Name", r.name, { max: 60 }), r.name),
-      url: withOriginal(field("GitHub link", r.url, { placeholder: "https://github.com/…" }), r.url),
-      description: withOriginal(field("Description", r.description, { max: 240, area: true }), r.description),
-      stack: withOriginal(field("Stack (comma separated)", r.stack.join(", "), { hint: "e.g. Python, MySQL" }), r.stack.join(", ")),
-      page: withOriginal(field("Details page of this site (optional)", r.page || "", { placeholder: "techbot.html" }), r.page || ""),
-    }),
-    ops: { move: "repo.move", visible: "repo.visible", remove: "repo.remove", update: "repo.update", idKey: "repo_id" },
-  });
-  const f = {
-    id: field("Id (a-z, 0-9, hyphens)", "", { max: 40, placeholder: "beyond-docs" }), name: field("Name", "", { max: 60 }),
-    url: field("GitHub link", "", { placeholder: "https://github.com/Beyond-Oraganization/…" }), description: field("Description", "", { max: 240, area: true }),
-    stack: field("Stack (comma separated)", ""), page: field("Details page of this site (optional)", "", { placeholder: "techbot.html" }),
-  };
-  const add = h("details", { class: "add" }, h("summary", { text: "+ Add a repository" }), h("div", {}, ...Object.values(f).map(x => x.el),
-    h("div", { class: "actions" }, h("button", { class: "btn primary", onclick: () => {
-      const p = { id: f.id.get(), name: f.name.get(), url: f.url.get(), description: f.description.get(), stack: f.stack.get().split(",").map(s => s.trim()).filter(Boolean) };
-      if (f.page.get().trim()) p.page = f.page.get().trim();
-      edit("repo.add", p, "Repository added.");
-    }, text: "Add repository" }))));
-  return [h("h2", { text: "GitHub page" }), h("p", { class: "hint", text: "Repositories of the organization " + state.config.site.org_url.replace("https://", "") + "." }),
-    ...Object.values(fields).map(x => x.el), h("div", { class: "actions" }, save),
-    h("h3", { text: "Repositories" }), ...(list.length ? list : [h("p", { class: "hint", text: "No repositories yet." })]), add];
+  return [h("h2", { text: "GitHub page" }), h("p", { class: "hint", text: "Repositories of " + state.config.site.org_url.replace("https://", "") + "." }),
+    pageForm({ key: "github", op: "github.set", ok: "GitHub page saved.", label: "Save page text", specs: [
+      { name: "title", label: "Page title", value: gh.title, max: 80 }, { name: "lead", label: "Lead", value: gh.lead, max: 240, area: true, rows: 3 }] }),
+    h("h3", { text: "Repositories" }),
+    ...listOf({
+      kind: "repo", noun: "repository", items: gh.repos, idKey: "repo_id", empty: "No repositories yet.",
+      ops: { move: "repo.move", visible: "repo.visible", remove: "repo.remove", update: "repo.update" },
+      describe: r => ({ title: r.name, meta: r.url.replace("https://", "") + (r.stack.length ? " · " + r.stack.join(", ") : "") }),
+      fixUpdate: c => { if (c.stack !== undefined) c.stack = csv(c.stack); return c; },
+      specs: r => [{ name: "name", label: "Name", value: r.name, max: 60 }, { name: "url", label: "GitHub link", value: r.url, placeholder: "https://github.com/…" },
+        { name: "description", label: "Description", value: r.description, max: 240, area: true, rows: 3 },
+        { name: "stack", label: "Stack", value: r.stack.join(", "), hint: "Comma separated, for example Python, MySQL" },
+        { name: "page", label: "Details page on this site (optional)", value: r.page || "", placeholder: "techbot.html" }],
+      addTitle: "Add a repository",
+      addSpecs: [{ name: "id", label: "Id", max: 40, placeholder: "beyond-docs", required: true }, { name: "name", label: "Name", max: 60, required: true },
+        { name: "url", label: "GitHub link", placeholder: "https://github.com/Beyond-Oraganization/…", required: true }, { name: "description", label: "Description", max: 240, area: true, rows: 3, required: true },
+        { name: "stack", label: "Stack", hint: "Comma separated" }, { name: "page", label: "Details page on this site (optional)", placeholder: "techbot.html" }],
+      addBuild: { op: "repo.add", params: v => { const p = { id: v.id, name: v.name, url: v.url, description: v.description, stack: csv(v.stack) }; if (v.page.trim()) p.page = v.page.trim(); return p; } },
+    })];
 }
 
-/* ---------- Publish tab ---------- */
+/* ================= Stories ================= */
+const GUIDE = [
+  ["A paragraph", "Just write it. Leave a blank line between paragraphs.", false],
+  ["> text", "The muted opening paragraph.", true], ["## Title", "A heading inside the story.", true], ["# Chapter 1", "A chapter heading (for verses).", true],
+  ["[1:1] text", "A numbered verse.", true], ["+ text", "Another paragraph of the verse just above it.", true], ["\\# text", "A paragraph that really begins with #, >, [ or +.", true],
+];
+const dirtyIn = prefix => [...ui.dirty].some(k => k.startsWith(prefix + ":"));
+const storyDirty = () => dirtyIn("story");
+const confirmLeave = what => !dirtyIn(what) || window.confirm("You have unsaved changes in this " + (what === "post" ? "post" : "story") + ". Leave without saving?");
+const confirmLeaveStory = () => confirmLeave("story");
+
+function renderStories() {
+  if (ui.story) return renderStoryEditor();
+  const stories = state.config.stories, items = stories.items;
+  const page = pageForm({ key: "stories", op: "stories.set", ok: "Stories page saved.", label: "Save", specs: [
+    { name: "title", label: "Page title", value: stories.title, max: 80 }, { name: "lead", label: "Introduction", value: stories.lead, max: 240, area: true, rows: 3 }] });
+  const pageBox = h("details", { class: "guide", open: ui.open.has("stories:page") }, h("summary", { text: "Page title and introduction" }), h("div", { style: "padding: 0 12px 12px" }, page));
+  pageBox.addEventListener("toggle", () => { pageBox.open ? ui.open.add("stories:page") : ui.open.delete("stories:page"); });
+  const list = h("div", { class: "list" });
+  items.forEach((s, i) => {
+    const k = "story:" + s.id;
+    list.append(row({
+      key: k, index: i, drag: true, title: (i + 1) + ". " + s.title, hidden: !s.visible,
+      meta: s.file + " · " + (s.kind === "verses" ? "verses" : "story") + " · " + wordsIn(state.story_texts[s.id] || "") + " words",
+      badges: [!s.visible ? h("span", { class: "badge draft", text: "draft" }) : null, h("span", { class: "badge", text: s.tag })],
+      onEdit: () => openStory(s.id), primaryLabel: "Edit story",
+      menuItems: [...moveItems("story_id", "story.move", items, i),
+        { label: "View page ↗", disabled: !s.visible, onClick: () => window.open("/preview/" + s.file, "_blank", "noopener") },
+        { label: s.visible ? "Make a draft (removes its page)" : "Publish", onClick: () => act("story.visible", { story_id: s.id, visible: !s.visible }, { ok: s.visible ? "Now a draft: its page is removed." : "Published." }) },
+        { label: "Remove…", danger: true, onClick: () => { ui.confirming = k; render(); } }],
+      confirmText: "Remove “" + trim(s.title, 50) + "” and its page? (Undo works right afterwards.)",
+      onConfirm: () => { ui.confirming = null; act("story.remove", { story_id: s.id }, { ok: "Story removed." }); },
+    }));
+  });
+  sortable(list, (from, to) => act("story.move", { story_id: items[from].id, position: to }));
+  const published = items.filter(s => s.visible).length, drafts = items.length - published;
+  return [h("h2", { text: "Stories" }),
+    h("p", { class: "hint", text: published + " published" + (drafts ? ", " + drafts + " draft(s)" : "") + ". Each story is one page; the list and the previous/next links follow this order." }),
+    h("div", { class: "actions", style: "margin: 0 0 14px" }, h("button", { class: "btn primary", onclick: () => openStory("+"), text: "+ New story" })),
+    pageBox, h("div", { style: "height: 14px" }), items.length ? list : h("div", { class: "empty", text: "No stories yet. Write the first one." })];
+}
+function openStory(id) {
+  ui.story = id; delete ui.formError.story; ui.focus = "story:title";
+  if (id !== "+") setPreview(state.config.stories.items.find(s => s.id === id).file);
+  render(); window.scrollTo(0, 0);
+}
+function closeStory() {
+  if (!confirmLeaveStory()) return;
+  clearDrafts("story"); delete ui.formError.story; ui.story = null; setPreview("stories.html"); render();
+}
+function renderStoryEditor() {
+  const isNew = ui.story === "+";
+  const s = isNew ? { id: "", title: "", kind: "story", tag: "Story", summary: "", aside: "", visible: true, file: "" } : state.config.stories.items.find(x => x.id === ui.story);
+  if (!s) { ui.story = null; return renderStories(); }
+  const page = h("span", { class: "meta", text: isNew ? "Page: story….html" : "Page: " + s.file });
+  const F = [];
+  let idField = null, touched = false;
+  if (isNew) { idField = field({ name: "id", label: "Short name", key: "story:id", max: 40, placeholder: "lighthouse", required: true,
+    hint: "Suggested from the title; lower-case letters, digits and hyphens. It becomes the page name and cannot be changed later.",
+    onInput: v => { page.textContent = "Page: story" + (v.replace(/-/g, "") || "…") + ".html"; } });
+    touched = idField.get() !== "" && idField.get() !== slugify(ui.drafts["story:title"] || "");
+    idField.input.addEventListener("input", () => { touched = true; });
+    F.push(idField); }
+  F.push(field({ name: "title", label: "Title", key: "story:title", value: s.title, max: 80, required: true, onInput: v => { if (idField && !touched) idField.set(slugify(v)); } }),
+    field({ name: "kind", label: "Kind", key: "story:kind", value: s.kind, options: [["story", "Story (prose)"], ["verses", "Verses (chapters of numbered verses)"]] }),
+    field({ name: "tag", label: "Tag", key: "story:tag", value: s.tag, max: 30, hint: "The small label, for example Myth or #BeyondBible." }),
+    field({ name: "summary", label: "Summary (shown on the stories list)", key: "story:summary", value: s.summary, max: 400, area: true, rows: 3, required: true }),
+    field({ name: "aside", label: "Side note (beside the text on the story page)", key: "story:aside", value: s.aside, max: 120, required: true }));
+  const words = h("span", { class: "meta" });
+  const body = field({ name: "body_text", label: "Story text", key: "story:body", value: isNew ? "" : (state.story_texts[s.id] || ""), area: true, body: true, required: true,
+    onInput: v => { words.textContent = wordsIn(v) + " words"; } });
+  words.textContent = wordsIn(body.get()) + " words";
+  F.push(body);
+  const byName = n => F.find(f => f.name === n);
+  const publishNow = isNew ? h("input", { type: "checkbox", id: "pubnow", checked: ui.drafts["story:pub"] === undefined ? true : ui.drafts["story:pub"], onchange: e => { ui.drafts["story:pub"] = e.target.checked; } }) : null;
+
+  const save = async view => {
+    let ok;
+    if (isNew) {
+      const v = collect(F);
+      ok = await act("story.add", { ...v, visible: publishNow.checked }, { form: "story", ok: "Story added.", closeForm: false, clear: "story" });
+      if (ok) { ui.story = null; const added = state.config.stories.items.find(x => x.id === v.id); setPreview(added && added.visible ? added.file : "stories.html"); render(); }
+    } else {
+      const c = changed(F);
+      if (!Object.keys(c).length) { toast("Nothing changed."); return; }
+      ok = await act("story.update", { story_id: s.id, ...c }, { form: "story", ok: "Story saved.", closeForm: false, clear: "story" });
+    }
+    if (ok && view && !isNew && s.visible) window.open("/preview/" + s.file, "_blank", "noopener");
+  };
+  const box = h("div", { "data-saveform": "1" }, errorBox("story"));
+  box._save = () => save(false);
+  const guide = h("details", { class: "guide", open: ui.open.has("story:guide") }, h("summary", { text: "How to write the text" }),
+    h("table", {}, GUIDE.map(([syntax, what, isCode]) => h("tr", {}, h("td", {}, isCode ? h("code", { text: syntax }) : syntax), h("td", { text: what })))));
+  guide.addEventListener("toggle", () => { guide.open ? ui.open.add("story:guide") : ui.open.delete("story:guide"); });
+  box.append(...[isNew ? byName("id").el : null, h("div", { class: "grid2" }, byName("title").el, byName("kind").el), byName("tag").el, byName("summary").el, byName("aside").el, body.el,
+    h("div", { style: "display:flex; justify-content: space-between; margin-top: 4px" }, words, page), guide,
+    isNew ? h("label", { style: "display:flex; gap:8px; align-items:center; font-weight:500; margin-top:16px" }, publishNow, "Publish it now (untick to keep it as a draft)") : null].filter(Boolean));   // append(null) would print "null"
+  return [h("button", { class: "btn quiet", style: "margin-left: -10px", onclick: closeStory, text: "← All stories" }),
+    h("h2", { text: isNew ? "New story" : s.title }),
+    h("p", { class: "hint", text: isNew ? "Fill in the details and write the text. It goes public only when you publish the site." : "Edit the details and the text. Saving rebuilds the page and the preview shows it." }),
+    box,
+    h("div", { class: "sticky" }, h("div", { class: "actions", style: "margin:0" },
+      h("button", { class: "btn primary", onclick: () => save(false), text: isNew ? "Add story" : "Save" }),
+      !isNew && s.visible ? h("button", { class: "btn", onclick: () => save(true), text: "Save and view page" }) : null,
+      h("button", { class: "btn", onclick: closeStory, text: "Close" }),
+      h("span", { class: "meta", id: "story-dirty", text: storyDirty() ? "● Unsaved changes · Ctrl+S saves" : "No unsaved changes" })))];
+}
+
+/* ================= Blog ================= */
+const POST_GUIDE = [
+  ["A paragraph", "Just write it. Leave a blank line between paragraphs.", false],
+  ["[words](https://example.com)", "A link. Only http(s) addresses and pages of this site (page.html) are accepted.", true],
+  ["> text", "A muted paragraph, often used as an opening line.", true], ["## Title", "A heading inside the post.", true],
+  ["\\# text", "A paragraph that really begins with #, >, [ or +.", true],
+];
+const postDirty = () => dirtyIn("post");
+
+function renderBlog() {
+  if (ui.post) return renderPostEditor();
+  const blog = state.config.blog, items = blog.items;
+  const page = pageForm({ key: "blog", op: "blog.set", ok: "Blog page saved.", label: "Save", specs: [
+    { name: "title", label: "Page title", value: blog.title, max: 80 }, { name: "lead", label: "Introduction", value: blog.lead, max: 240, area: true, rows: 3 }] });
+  const pageBox = h("details", { class: "guide", open: ui.open.has("blog:page") }, h("summary", { text: "Page title and introduction" }), h("div", { style: "padding: 0 12px 12px" }, page));
+  pageBox.addEventListener("toggle", () => { pageBox.open ? ui.open.add("blog:page") : ui.open.delete("blog:page"); });
+  const ordered = items.map((p, i) => ({ p, i })).sort((a, b) => (a.p.date < b.p.date ? 1 : a.p.date > b.p.date ? -1 : a.i - b.i));
+  const list = h("div", { class: "list" });
+  ordered.forEach(({ p }, n) => {
+    const k = "post:" + p.id;
+    list.append(row({
+      key: k, index: n, title: p.title, hidden: !p.visible,
+      meta: p.date + " · " + p.file + " · " + wordsIn(state.post_texts[p.id] || "") + " words",
+      badges: [!p.visible ? h("span", { class: "badge draft", text: "draft" }) : null, ...p.tags.map(t => h("span", { class: "badge", text: t }))],
+      onEdit: () => openPost(p.id), primaryLabel: "Edit post",
+      menuItems: [
+        { label: "View page ↗", disabled: !p.visible, onClick: () => window.open("/preview/" + p.file, "_blank", "noopener") },
+        { label: p.visible ? "Make a draft (removes its page)" : "Publish", onClick: () => act("post.visible", { post_id: p.id, visible: !p.visible }, { ok: p.visible ? "Now a draft: its page is removed." : "Published." }) },
+        { label: "Remove…", danger: true, onClick: () => { ui.confirming = k; render(); } }],
+      confirmText: "Remove “" + trim(p.title, 50) + "” and its page? (Undo works right afterwards.)",
+      onConfirm: () => { ui.confirming = null; act("post.remove", { post_id: p.id }, { ok: "Post removed." }); },
+    }));
+  });
+  const published = items.filter(p => p.visible).length, drafts = items.length - published;
+  return [h("h2", { text: "Blog" }),
+    h("p", { class: "hint", text: published + " published" + (drafts ? ", " + drafts + " draft(s)" : "") + ". The list shows the newest post first, by the date you give each post." }),
+    h("div", { class: "actions", style: "margin: 0 0 14px" }, h("button", { class: "btn primary", onclick: () => openPost("+"), text: "+ New post" })),
+    pageBox, h("div", { style: "height: 14px" }), items.length ? list : h("div", { class: "empty", text: "No posts yet. Write the first one." })];
+}
+function openPost(id) {
+  ui.post = id; delete ui.formError.post; ui.focus = "post:title";
+  if (id !== "+") setPreview(state.config.blog.items.find(p => p.id === id).file);
+  render(); window.scrollTo(0, 0);
+}
+function closePost() {
+  if (!confirmLeave("post")) return;
+  clearDrafts("post"); delete ui.formError.post; ui.post = null; setPreview("blog.html"); render();
+}
+function renderPostEditor() {
+  const isNew = ui.post === "+";
+  const p = isNew ? { id: "", title: "", date: todayLocal(), tags: [], summary: "", visible: true, file: "" } : state.config.blog.items.find(x => x.id === ui.post);
+  if (!p) { ui.post = null; return renderBlog(); }
+  const page = h("span", { class: "meta", text: isNew ? "Page: blog-….html" : "Page: " + p.file });
+  const F = [];
+  let idField = null, touched = false;
+  if (isNew) { idField = field({ name: "id", label: "Short name", key: "post:id", max: 40, placeholder: "my-first-post", required: true,
+    hint: "Suggested from the title; lower-case letters, digits and hyphens. It becomes the page name and cannot be changed later.",
+    onInput: v => { page.textContent = "Page: blog-" + (v || "…") + ".html"; } });
+    touched = idField.get() !== "" && idField.get() !== slugify(ui.drafts["post:title"] || "");
+    idField.input.addEventListener("input", () => { touched = true; });
+    F.push(idField); }
+  F.push(field({ name: "title", label: "Title", key: "post:title", value: p.title, max: 80, required: true, onInput: v => { if (idField && !touched) idField.set(slugify(v)); } }),
+    field({ name: "date", label: "Date", key: "post:date", value: p.date, type: "date", required: true, hint: "Posts are listed newest first by this date. It is shown exactly as chosen." }),
+    field({ name: "tags", label: "Tags", key: "post:tags", value: p.tags.join(", "), hint: "Comma separated, at most 4, for example News, Ideas." }),
+    field({ name: "summary", label: "Summary (shown on the blog list)", key: "post:summary", value: p.summary, max: 400, area: true, rows: 3, required: true }));
+  const words = h("span", { class: "meta" });
+  const body = field({ name: "body_text", label: "Post text", key: "post:body", value: isNew ? "" : (state.post_texts[p.id] || ""), area: true, body: true, required: true,
+    onInput: v => { const n = wordsIn(v); words.textContent = n + " words · about " + Math.max(1, Math.round(n / 200)) + " min read"; } });
+  { const n = wordsIn(body.get()); words.textContent = n + " words · about " + Math.max(1, Math.round(n / 200)) + " min read"; }
+  F.push(body);
+  const byName = n => F.find(f => f.name === n);
+  const publishNow = isNew ? h("input", { type: "checkbox", id: "postpub", checked: ui.drafts["post:pub"] === undefined ? true : ui.drafts["post:pub"], onchange: e => { ui.drafts["post:pub"] = e.target.checked; } }) : null;
+  const prep = v => ({ ...v, ...(v.tags !== undefined ? { tags: csv(v.tags) } : {}) });
+
+  const save = async view => {
+    let ok;
+    if (isNew) {
+      const v = prep(collect(F));
+      ok = await act("post.add", { ...v, visible: publishNow.checked }, { form: "post", ok: "Post added.", closeForm: false, clear: "post" });
+      if (ok) { ui.post = null; const added = state.config.blog.items.find(x => x.id === v.id); setPreview(added && added.visible ? added.file : "blog.html"); render(); }
+    } else {
+      const c = changed(F);
+      if (!Object.keys(c).length) { toast("Nothing changed."); return; }
+      ok = await act("post.update", { post_id: p.id, ...prep(c) }, { form: "post", ok: "Post saved.", closeForm: false, clear: "post" });
+    }
+    if (ok && view && !isNew && p.visible) window.open("/preview/" + p.file, "_blank", "noopener");
+  };
+  const box = h("div", { "data-saveform": "1" }, errorBox("post"));
+  box._save = () => save(false);
+  const guide = h("details", { class: "guide", open: ui.open.has("post:guide") }, h("summary", { text: "How to write the text" }),
+    h("table", {}, POST_GUIDE.map(([syntax, what, isCode]) => h("tr", {}, h("td", {}, isCode ? h("code", { text: syntax }) : syntax), h("td", { text: what })))));
+  guide.addEventListener("toggle", () => { guide.open ? ui.open.add("post:guide") : ui.open.delete("post:guide"); });
+  box.append(...[isNew ? byName("id").el : null, h("div", { class: "grid2" }, byName("title").el, byName("date").el), byName("tags").el, byName("summary").el, body.el,
+    h("div", { style: "display:flex; justify-content: space-between; margin-top: 4px" }, words, page), guide,
+    isNew ? h("label", { style: "display:flex; gap:8px; align-items:center; font-weight:500; margin-top:16px" }, publishNow, "Publish it now (untick to keep it as a draft)") : null].filter(Boolean));
+  return [h("button", { class: "btn quiet", style: "margin-left: -10px", onclick: closePost, text: "← All posts" }),
+    h("h2", { text: isNew ? "New post" : p.title }),
+    h("p", { class: "hint", text: isNew ? "Fill in the details and write the text. It goes public only when you publish the site." : "Edit the details and the text. Saving rebuilds the page and the preview shows it." }),
+    box,
+    h("div", { class: "sticky" }, h("div", { class: "actions", style: "margin:0" },
+      h("button", { class: "btn primary", onclick: () => save(false), text: isNew ? "Add post" : "Save" }),
+      !isNew && p.visible ? h("button", { class: "btn", onclick: () => save(true), text: "Save and view page" }) : null,
+      h("button", { class: "btn", onclick: closePost, text: "Close" }),
+      h("span", { class: "meta", id: "post-dirty", text: postDirty() ? "● Unsaved changes · Ctrl+S saves" : "No unsaved changes" })))];
+}
+
+/* ================= Publish ================= */
 function renderPublish() {
-  const s = state.status, out = [h("h2", { text: "Publish" }), h("p", { class: "hint", text: "Commits only site.config.json, index.html and github.html, then pushes to GitHub. Nothing is ever forced." })];
+  const s = state.status, out = [h("h2", { text: "Publish" }), h("p", { class: "hint", text: "Commits only the files this tool manages, then pushes them to GitHub. Nothing is ever forced." })];
   const line = (ok, text) => h("li", { class: ok ? "ok-t" : "bad-t", text: (ok ? "✓ " : "✗ ") + text });
-  const items = [line(s.valid, s.valid ? "Config is valid" : "Config is invalid")];
-  if (!s.valid) { out.push(h("ul", { class: "plain" }, items), h("pre", { text: s.problems.join("\n") })); return out; }
-  items.push(line(!s.stale.length, s.stale.length ? "Pages out of date: " + s.stale.join(", ") : "Pages match the config"));
-  items.push(line(!s.site_problems.length, s.site_problems.length ? "Site checks found " + s.site_problems.length + " problem(s)" : "Site checks pass (links, anchors, navigation, fonts)"));
+  if (!s.valid) { out.push(h("ul", { class: "checks" }, line(false, "The config is invalid")), h("pre", { text: s.problems.join("\n") })); return out; }
+  const items = [line(true, "Config is valid"), line(!s.stale.length, s.stale.length ? "Pages out of date: " + s.stale.join(", ") : "Pages match the config"),
+    line(!s.site_problems.length, s.site_problems.length ? "Site checks found " + s.site_problems.length + " problem(s)" : "Site checks pass (links, anchors, navigation, fonts)")];
   if (!s.git) items.push(h("li", { class: "warn-t", text: "! This folder is not a Git repository, so it cannot be published." }));
   else {
-    items.push(line(s.git.origin, s.git.origin ? "Remote 'origin' is set" : "No remote named 'origin'"));
+    items.push(line(s.git.origin, s.git.origin ? "Remote “origin” is set" : "No remote named “origin”"));
     items.push(line(!!s.git.branch, s.git.branch ? "On branch " + s.git.branch : "Not on a branch (detached HEAD)"));
-    items.push(h("li", { text: s.git.changed.length ? "Unpublished: " + s.git.changed.join(", ") : "Nothing unpublished" }));
+    items.push(h("li", { text: s.git.changed.length ? "To publish: " + s.git.changed.join(", ") : "Nothing to publish" }));
   }
-  out.push(h("ul", { class: "plain" }, items));
+  out.push(h("ul", { class: "checks" }, items));
   if (s.site_problems.length) out.push(h("pre", { text: s.site_problems.join("\n") }));
-  if (s.stale.length) out.push(h("div", { class: "actions" }, h("button", { class: "btn", onclick: () => run(() => post("/api/build"), "Pages rebuilt."), text: "Rebuild pages" })));
-
+  if (s.stale.length) out.push(h("div", { class: "actions" }, h("button", { class: "btn", onclick: async () => { try { state = await post("/api/build"); render(); reloadPreview(); toast("Pages rebuilt."); } catch (e) { toast(friendly(e.message), { bad: true }); } }, text: "Rebuild pages" })));
   const ready = s.git && s.git.origin && s.git.branch && !s.site_problems.length;
-  const msg = field("Commit message", ui.message, { max: 100, placeholder: "Describe the change" });
+  const msg = field({ name: "message", label: "Commit message", value: ui.message, max: 100, placeholder: "Describe the change, for example “Add the story Lighthouse”", required: true });
   msg.input.addEventListener("input", () => { ui.message = msg.get(); ui.confirming = null; });
-  const doPublish = (dry) => run(async () => { const d = await post("/api/publish", { message: msg.get() || "(dry run)", dry_run: dry }); ui.publish = d.publish; return d; });
+  const doPublish = async dry => {
+    if (ui.busy) return; ui.busy = true;
+    try { const d = await post("/api/publish", { message: msg.get() || "(preview)", dry_run: dry }); state = d; ui.publish = d.publish; ui.busy = false; render(); if (!dry && d.publish.status === "published") toast("Published " + d.publish.commit + " to origin/" + d.publish.branch + "."); }
+    catch (e) { ui.busy = false; render(); toast(friendly(e.message), { bad: true }); }
+  };
   out.push(h("h3", { text: "Send to GitHub" }), msg.el, h("div", { class: "actions" },
     h("button", { class: "btn", disabled: !ready, onclick: () => doPublish(true), text: "Preview (changes nothing)" }),
     ui.confirming === "publish"
-      ? h("button", { class: "btn danger", onclick: () => { ui.confirming = null; if (!msg.get().trim()) return toast("Write a commit message first.", true); doPublish(false).then(() => { if (ui.publish && ui.publish.status === "published") toast("Published " + ui.publish.commit + " to origin/" + ui.publish.branch + "."); }); }, text: "Yes, publish now" })
+      ? h("button", { class: "btn danger", onclick: () => { ui.confirming = null; if (!msg.get().trim()) { toast("Write a commit message first.", { bad: true }); return; } doPublish(false); }, text: "Yes, publish now" })
       : h("button", { class: "btn primary", disabled: !ready, onclick: () => { ui.confirming = "publish"; render(); }, text: "Publish" })));
   if (ui.publish) {
     const p = ui.publish;
-    const text = p.status === "dry-run" ? "Preview. Nothing was changed. Would run:\n  " + p.commands.join("\n  ")
-      : p.status === "nothing" ? "Nothing to publish."
-      : "Published " + p.commit + " to origin/" + p.branch + ": " + (p.files.join(", ") || "earlier local commits");
+    const text = p.status === "dry-run" ? "Preview. Nothing was changed. Would run:\n  " + p.commands.join("\n  ") : p.status === "nothing" ? "Nothing to publish." : "Published " + p.commit + " to origin/" + p.branch + ": " + (p.files.join(", ") || "earlier local commits");
     out.push(h("pre", { text: (p.pages.length ? "Pages rebuilt: " + p.pages.join(", ") + "\n" : "") + text }));
   }
   return out;
 }
 
-/* ---------- main render ---------- */
+/* ================= main ================= */
 function render() {
-  const tabs = document.getElementById("tabs");
-  tabs.replaceChildren(...TABS.map(([id, label]) => h("button", { role: "tab", id: "tab-" + id, "aria-selected": String(ui.tab === id), onclick: () => { ui.tab = id; ui.confirming = null; const page = PAGE_OF_TAB[id]; if (page && page !== ui.previewPage) { ui.previewPage = page; renderPreviewBar(); reloadPreview(); } render(); }, text: label })));
+  const scroll = window.scrollY;
+  renderChips(); renderRail();
   const panel = document.getElementById("panel");
   panel.replaceChildren();
-  panel.setAttribute("aria-labelledby", "tab-" + ui.tab);
-  renderChips();
-  if (!state.config) {   // invalid config: only the publish tab explains why
+  if (!state.config) {
     panel.append(h("h2", { text: "The config cannot be read" }), h("p", { class: "hint", text: "Fix site.config.json, then reload this page. Each problem is listed with its location." }), h("pre", { text: state.status.problems.join("\n") }));
     return;
   }
-  const view = { home: renderHome, doors: renderDoors, plans: renderPlans, github: renderGithub, publish: renderPublish }[ui.tab];
-  panel.append(...view());
+  panel.append(...{ home: renderHome, doors: renderDoors, stories: renderStories, blog: renderBlog, plans: renderPlans, github: renderGithub, publish: renderPublish }[ui.tab]());
+  updateDirty();
+  if (ui.focus) { const el = panel.querySelector('[data-fkey="' + ui.focus + '"]'); if (el) el.focus(); ui.focus = null; } else window.scrollTo(0, scroll);
 }
 
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+    e.preventDefault();
+    const form = document.activeElement && document.activeElement.closest ? document.activeElement.closest("[data-saveform]") : null;
+    if (form && form._save) form._save(); else toast("Click into a form first, then press Ctrl+S to save it.");
+  }
+});
+document.getElementById("undo").addEventListener("click", undo);
+document.getElementById("ptoggle").addEventListener("click", () => { ui.previewOpen = !ui.previewOpen; applyPreviewVisibility(); });
+
 (async function start() {
-  renderPreviewBar();
   document.getElementById("statuses").append(...STATUSES.map(v => h("option", { value: v })));
+  renderPreviewBar(); applyPreviewVisibility();
   try { await load(); render(); }
   catch (e) { document.getElementById("panel").append(h("h2", { text: "Cannot reach the manager" }), h("p", { text: e.message })); }
 })();

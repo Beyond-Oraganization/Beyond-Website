@@ -16,7 +16,7 @@ import os
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Sequence
 
 from .build import MANAGED_FILES
 from .errors import GitError
@@ -67,7 +67,7 @@ def _lines(text: str) -> List[str]:
     return [line for line in text.splitlines() if line.strip()]
 
 
-def _preflight(git: Git) -> str:
+def _preflight(git: Git, managed: Sequence[str]) -> str:
     """Refuse early, before anything is touched. Returns the branch name."""
     if not git.ok("rev-parse", "--is-inside-work-tree"):
         raise GitError(f"{git.cwd} is not a Git repository. Run `git init` and add the origin first.")
@@ -77,7 +77,7 @@ def _preflight(git: Git) -> str:
     if not branch:
         raise GitError("HEAD is detached (not on a branch). Check out a branch such as 'main' first.")
     staged = _lines(git.out("diff", "--cached", "--name-only", "--relative"))
-    foreign = [name for name in staged if name not in MANAGED_FILES]
+    foreign = [name for name in staged if name not in managed]
     if foreign:
         raise GitError(
             "other files are already staged, and publishing would commit them too:\n  "
@@ -87,12 +87,18 @@ def _preflight(git: Git) -> str:
     return branch
 
 
-def _changed_managed(git: Git) -> List[str]:
-    existing = [name for name in MANAGED_FILES if (git.cwd / name).exists()]
-    if not existing:
+def _candidates(git: Git, managed: Sequence[str]) -> List[str]:
+    """Managed names that exist on disk or that Git still tracks (a tracked file that is gone is a deletion)."""
+    tracked = set(_lines(git.run("ls-files", "--", *managed).stdout)) if managed else set()
+    return [name for name in managed if (git.cwd / name).exists() or name in tracked]
+
+
+def _changed_managed(git: Git, managed: Sequence[str] = MANAGED_FILES) -> List[str]:
+    names = _candidates(git, managed)
+    if not names:
         return []
     # Not git.out(): its strip() would eat the leading space of " M file".
-    status = git.run("status", "--porcelain", "--untracked-files=all", "--", *existing).stdout
+    status = git.run("status", "--porcelain", "--untracked-files=all", "--", *names).stdout
     return [line[3:] for line in _lines(status)]
 
 
@@ -125,13 +131,14 @@ def publish(
     dry_run: bool = False,
     say: Callable[[str], None] = lambda _text: None,
     git: Optional[Git] = None,
+    managed: Sequence[str] = MANAGED_FILES,
 ) -> PublishResult:
     """Commit the managed files and push them. Callers validate and build first."""
     if not message or not message.strip():
         raise GitError("a commit message is required")
     git = git or Git(site_dir)
-    branch = _preflight(git)
-    changed = _changed_managed(git)
+    branch = _preflight(git, managed)
+    changed = _changed_managed(git, managed)
 
     if dry_run:
         plan = ["git add -- " + " ".join(changed)] if changed else []
@@ -141,7 +148,7 @@ def publish(
 
     committed = False
     if changed:
-        git.run("add", "--", *[name for name in MANAGED_FILES if (git.cwd / name).exists()])
+        git.run("add", "-A", "--", *_candidates(git, managed))
         if not git.ok("diff", "--cached", "--quiet"):
             git.run("commit", "-m", message)
             committed = True

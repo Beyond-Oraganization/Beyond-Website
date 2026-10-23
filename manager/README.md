@@ -1,7 +1,7 @@
 # Beyondia site manager
 
-Edit the **home page**, the **plans page** and the **GitHub page** of the Beyondia site, from a graphical interface or the command line.
-Every change goes into one file, `site.config.json`; the pages `index.html`, `plans.html` and `github.html`
+Edit the **home page**, the **stories**, the **blog**, the **plans page** and the **GitHub page** of the Beyondia site, from a graphical interface or the command line.
+Every change goes into one file, `site.config.json`; the pages `index.html`, `stories.html` (and one page per story), `blog.html` (and one page per post), `plans.html` and `github.html`
 are generated from it and published to GitHub with one command.
 
 Needs only `python3` (3.9 or newer). Nothing to install. The design and the reasons behind every
@@ -19,15 +19,41 @@ manager/bm tile list         # what is on the home page map
 manager/bm ui
 ```
 
-Opens `http://127.0.0.1:8787/` in your browser: tabs for **Home**, **Doors**, **Plans**, **GitHub** and **Publish**, and a live
-preview of the real pages on the right (with a phone-width switch). Everything the command line can do is there:
-add, edit, reorder (arrows), hide/show, remove (asks twice), and a **Preview** button on the Publish tab that shows
-exactly what would be pushed before you press **Publish**. Use `--port 9000` if 8787 is taken, `--no-open` to skip
-launching the browser. Stop it with Ctrl+C.
+Opens `http://127.0.0.1:8787/` in your browser. Use `--port 9000` if 8787 is taken, `--no-open` to skip launching the browser, Ctrl+C to stop.
 
-It is a local program, not a website: it listens on your own computer only, and refuses requests that did not
-come from its own page (see PLAN.md section 11). The interface and the command line share the same code, so they
-can be mixed freely.
+* **Left menu:** Home, Doors, Stories, Blog, Plans, GitHub, Publish. The numbers are item counts.
+* **Preview** on the right shows the real page and follows the section you are in. It can be hidden (button at the top), switched to phone width, or opened in its own tab.
+* **Rows:** *Edit* opens the form in place; the **⋯** menu holds Move, Hide/Show and Remove; you can also **drag a row** to reorder it.
+* **Nothing you type is lost** when the server refuses a change: the reason is shown in plain words above the form and your text stays.
+* **Undo** (top right, and in the message after every change) steps back through your last 50 changes, including a removed story and its page. It refuses if something else (the command line, a text editor) changed the config in the meantime, so it never overwrites that work.
+* **Ctrl/Cmd+S** saves the form you are in. A marker shows unsaved typing, and the browser asks before you close the tab with unsaved typing.
+* **Publish:** press **Preview** to see exactly what would be pushed, then **Publish** (it asks once more).
+
+### Writing stories
+
+*Stories → + New story* (or *Edit story* on a row). Fill in the title, kind, tag, summary and side note, then write the text in the big box. The text is plain text:
+
+| You type | It becomes |
+|----------|-----------|
+| a paragraph, then a blank line | a paragraph |
+| `> text` | the muted opening paragraph |
+| `## Title` | a heading inside the story |
+| `# Chapter 1` | a chapter heading (for verses) |
+| `[1:1] text` | a numbered verse |
+| `+ text` right after a verse | another paragraph of that verse |
+| `\# text` | a paragraph that really begins with `#`, `>`, `[` or `+` |
+
+Each story is one page (`story<name>.html`, existing pages keep their names). The stories list, the previous/next
+links and the number on the home page (“Seven stories so far”) follow automatically. **Make a draft** removes a
+story's page without losing the text; **Remove** deletes it. A page you wrote by hand is never deleted.
+
+### Writing blog posts
+
+*Blog → + New post*. A post has a title, a **date** (posts are listed newest first by it), up to four tags, a summary
+and the text. The short name (the page name, `blog-<name>.html`) is suggested from the title. The text works like a
+story's, plus links: `[words](https://example.com)`. Only `http(s)` addresses and pages of this site are accepted; a
+link that is not allowed stops the save and says so. The page shows the date exactly as you chose it (it never uses
+the clock) and a reading time. **Make a draft** removes a post's page without losing the text.
 
 ## Everyday use (command line)
 
@@ -43,6 +69,18 @@ can be mixed freely.
 | Change the buttons / the moving strip | `manager/bm button add "Read" stories.html --style ghost`, `manager/bm ticker add "A new phrase"` |
 | List a repository on the GitHub page | `manager/bm repo add my-repo --name My-Repo --url https://github.com/Beyond-Oraganization/My-Repo --description "What it is." --stack "Python,MySQL"` |
 | Hide / change / remove a repository | `manager/bm repo hide ID`, `repo set ID --description "..."`, `repo remove ID` |
+| List the blog posts (newest first) | `manager/bm post list` |
+| Add a post from a text file | `manager/bm post add hello --title "Hello" --summary "..." --date 2026-10-23 --tags "News, Ideas" --body-file hello.txt` (date defaults to today) |
+| Edit a post's text | `manager/bm post body hello > h.txt`, edit it, then `manager/bm post set hello --body-file h.txt` |
+| Change title, date, tags or summary | `manager/bm post set ID --title "..." --date 2026-11-01 --tags "News"` |
+| Make a draft, publish, remove a post | `manager/bm post hide ID`, `post unhide ID`, `post remove ID` |
+| Change the blog list heading | `manager/bm blog set --title "..." --lead "..."` |
+| List the stories | `manager/bm story list` |
+| Add a story from a text file | `manager/bm story add lighthouse --title "The Lighthouse" --summary "..." --aside "..." --tag Myth --body-file lighthouse.txt` (`--body-file -` reads standard input) |
+| Edit a story's text | `manager/bm story body lighthouse > l.txt`, edit `l.txt`, then `manager/bm story set lighthouse --body-file l.txt` |
+| Change title, tag, summary or kind | `manager/bm story set ID --title "..." --kind verses` |
+| Reorder, make a draft, publish, remove | `manager/bm story move ID 1`, `story hide ID`, `story unhide ID`, `story remove ID` |
+| Change the stories list heading | `manager/bm stories set --title "..." --lead "..."` |
 | Change the plans page text / roadmap heading | `manager/bm plans set --title "..." --roadmap-title "..."` |
 | See the plans in their lanes | `manager/bm plan list` (lanes: `lane list`, roadmap: `step list`) |
 | Add a plan to a lane | `manager/bm plan add bot-v2 --lane building --title "Bot version two" --text "A rewrite." --status Planned` |
@@ -65,7 +103,7 @@ Other commands: `validate`, `check` (links, anchors, navigation, fonts of all pa
 ## Publishing
 
 `manager/bm publish -m "message"` validates, builds, checks the whole site, commits **only**
-`site.config.json`, `index.html`, `plans.html` and `github.html`, runs `git pull --rebase`, and pushes.
+`site.config.json`, `index.html`, `plans.html`, `stories.html`, `blog.html`, `github.html`, the story and post pages (including the deletion of a removed page), runs `git pull --rebase`, and pushes.
 It never uses `--force`. Your other uncommitted files are not touched or published.
 If GitHub has a conflicting change, nothing is pushed and the message tells you what to do.
 
@@ -83,7 +121,7 @@ git fetch origin && git reset origin/main      # keeps your files, only adopts t
 sh manager/run_tests.sh
 ```
 
-Runs about 220 tests in a few seconds, with no network. GitHub Actions runs them on every push
+Runs about 360 tests in a few seconds, with no network. GitHub Actions runs them on every push
 (`.github/workflows/test.yml`), together with `bm build --check` and `bm check`, so a green check
 on GitHub means the pages match the config and no link is broken.
 

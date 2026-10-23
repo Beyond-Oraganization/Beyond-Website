@@ -9,18 +9,18 @@ refused without touching any file.
 from __future__ import annotations
 
 import argparse
+import datetime
 import os
 import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, TextIO
 
 from . import config as cfg
-from . import model, publisher, service
+from . import model, service, storytext
 from .build import CONFIG_NAME, build
 from .checks import check_site
 from .config import BUTTON_STYLES
 from .errors import ManagerError
-from .publisher import Git
 from .service import LOCK_NAME
 
 ENV_SITE_DIR = "BEYONDIA_SITE_DIR"
@@ -191,6 +191,65 @@ def _parser() -> argparse.ArgumentParser:
     step.add_parser("hide").add_argument("id")
     step.add_parser("unhide").add_argument("id")
 
+    stories = groups.add_parser("stories", help="the stories list page: title and lead").add_subparsers(dest="action", required=True)
+    stories.add_parser("show")
+    sts = stories.add_parser("set")
+    sts.add_argument("--title")
+    sts.add_argument("--lead")
+
+    story = groups.add_parser("story", help="stories and verses (one page each)").add_subparsers(dest="action", required=True)
+    story.add_parser("list")
+    story.add_parser("info").add_argument("id")
+    story.add_parser("body", help="print the body as editable text").add_argument("id")
+    sa = story.add_parser("add")
+    sa.add_argument("id", help="short name, for example 'lighthouse'; the page becomes storylighthouse.html")
+    for name in ("title", "summary", "aside"):
+        sa.add_argument(f"--{name}", required=True)
+    sa.add_argument("--kind", choices=("story", "verses"), default="story")
+    sa.add_argument("--tag", default="Story")
+    sa.add_argument("--body-file", required=True, help="text file with the story ('-' reads standard input)")
+    sa.add_argument("--hidden", action="store_true", help="keep it as a draft: no page, not listed")
+    sa.add_argument("--position", type=int)
+    story.add_parser("remove").add_argument("id")
+    sm = story.add_parser("move")
+    sm.add_argument("id")
+    sm.add_argument("position", type=int)
+    ss = story.add_parser("set")
+    ss.add_argument("id")
+    for name in ("title", "tag", "summary", "aside"):
+        ss.add_argument(f"--{name}")
+    ss.add_argument("--kind", choices=("story", "verses"))
+    ss.add_argument("--body-file", help="replace the body with this text file ('-' reads standard input)")
+    story.add_parser("hide", help="turn into a draft: the page is removed").add_argument("id")
+    story.add_parser("unhide").add_argument("id")
+
+    blog = groups.add_parser("blog", help="the blog list page: title and lead").add_subparsers(dest="action", required=True)
+    blog.add_parser("show")
+    bls = blog.add_parser("set")
+    bls.add_argument("--title")
+    bls.add_argument("--lead")
+
+    post = groups.add_parser("post", help="blog posts (one page each, newest first)").add_subparsers(dest="action", required=True)
+    post.add_parser("list")
+    post.add_parser("info").add_argument("id")
+    post.add_parser("body", help="print the body as editable text").add_argument("id")
+    pa = post.add_parser("add")
+    pa.add_argument("id", help="short name, for example 'hello'; the page becomes blog-hello.html")
+    for name in ("title", "summary"):
+        pa.add_argument(f"--{name}", required=True)
+    pa.add_argument("--date", help="YYYY-MM-DD (default: today)")
+    pa.add_argument("--tags", default="", help="comma separated, at most 4")
+    pa.add_argument("--body-file", required=True, help="text file with the post ('-' reads standard input)")
+    pa.add_argument("--hidden", action="store_true", help="keep it as a draft: no page, not listed")
+    post.add_parser("remove").add_argument("id")
+    pst = post.add_parser("set")
+    pst.add_argument("id")
+    for name in ("title", "date", "tags", "summary"):
+        pst.add_argument(f"--{name}")
+    pst.add_argument("--body-file", help="replace the body with this text file ('-' reads standard input)")
+    post.add_parser("hide", help="turn into a draft: the page is removed").add_argument("id")
+    post.add_parser("unhide").add_argument("id")
+
     groups.add_parser("validate", help="check site.config.json")
     groups.add_parser("check", help="check links, anchors, navigation and fonts of the pages")
     bp = groups.add_parser("build", help="write index.html and github.html from the config")
@@ -229,8 +288,8 @@ def _apply(site: Path, con: Console, edit: Callable[[Dict[str, Any]], Dict[str, 
 
 
 def _report_build(con: Console, result: Any) -> None:
-    if result.changed:
-        con.say("Rebuilt: " + ", ".join(result.changed))
+    if result.changed or result.removed:
+        con.say("Rebuilt: " + ", ".join(result.changed + [f"{n} (deleted)" for n in result.removed]))
     else:
         con.say("Pages already up to date.")
 
@@ -265,6 +324,13 @@ def _list_ticker(config: Dict[str, Any], con: Console) -> None:
 def _list_tiles(config: Dict[str, Any], con: Console) -> None:
     for i, t in enumerate(config["home"]["map"]["tiles"], 1):
         con.say(f"{i:2}. {t['id']:14} {t['title']}  ->  {t['href']}{_visible_mark(t)}")
+
+
+def _find(items: List[Dict[str, Any]], item_id: str, what: str) -> Dict[str, Any]:
+    for item in items:
+        if item["id"] == item_id:
+            return item
+    raise ManagerError(f"there is no {what} with id '{item_id}'")
 
 
 def _info(items: List[Dict[str, Any]], item_id: str, what: str, con: Console) -> None:
@@ -319,6 +385,43 @@ def _list_steps(config: Dict[str, Any], con: Console) -> None:
         con.say(f"{i:2}. {st['id']:20} {st['when']}: {st['title']}  ({st['status']}){_visible_mark(st)}")
 
 
+def _show_stories(config: Dict[str, Any], con: Console) -> None:
+    con.say(f"title       {config['stories']['title']}")
+    con.say(f"lead        {config['stories']['lead']}")
+    con.say(f"stories     {len(config['stories']['items'])}")
+
+
+def _list_stories(config: Dict[str, Any], con: Console) -> None:
+    items = config["stories"]["items"]
+    if not items:
+        con.say("(no stories)")
+    for i, st in enumerate(items, 1):
+        con.say(f"{i:2}. {st['id']:12} {st['title']}  [{st['kind']}] {st['file']}{'' if st['visible'] else '  [draft]'}")
+
+
+def _show_blog(config: Dict[str, Any], con: Console) -> None:
+    con.say(f"title       {config['blog']['title']}")
+    con.say(f"lead        {config['blog']['lead']}")
+    con.say(f"posts       {len(config['blog']['items'])}")
+
+
+def _list_posts(config: Dict[str, Any], con: Console) -> None:
+    items = config["blog"]["items"]
+    if not items:
+        con.say("(no posts)")
+    for p in sorted(items, key=lambda p: p["date"], reverse=True):
+        con.say(f"{p['date']}  {p['id']:18} {p['title']}  {p['file']}{'' if p['visible'] else '  [draft]'}")
+
+
+def _read_body(path: str) -> str:
+    try:
+        if path == "-":
+            return sys.stdin.read()
+        return Path(path).read_text(encoding="utf-8")
+    except OSError as error:
+        raise ManagerError(f"cannot read {path}: {error.strerror}")
+
+
 def _all_plan_items(config: Dict[str, Any]) -> List[Dict[str, Any]]:
     return [item for lane in config["plans"]["lanes"] for item in lane["items"]]
 
@@ -336,14 +439,14 @@ def _cmd_check(site: Path, con: Console) -> int:
 
 def _cmd_status(site: Path, con: Console) -> int:
     config = cfg.load(site / CONFIG_NAME)
-    stale = build(site, config, check=True).changed
+    stale = build(site, config, check=True).stale
     con.say("Config:  valid")
     con.say("Pages:   " + ("up to date" if not stale else "OUT OF DATE (" + ", ".join(stale) + ") - run `bm build`"))
-    git = Git(site)
-    if not git.ok("rev-parse", "--is-inside-work-tree"):
+    summary = service.git_summary(site, service.managed_files(site, config))
+    if summary is None:
         con.say("Git:     not a Git repository")
         return 0
-    changed = publisher._changed_managed(git)
+    changed = summary["changed"]
     con.say("Git:     " + ("nothing to publish" if not changed else "unpublished changes in " + ", ".join(changed)))
     return 0
 
@@ -408,8 +511,8 @@ def run(args: argparse.Namespace, con: Console) -> int:
         config = cfg.load(site / CONFIG_NAME)
         result = build(site, config, check=args.check)
         if args.check:
-            if result.changed:
-                con.warn("Out of date: " + ", ".join(result.changed) + " - run `bm build`.")
+            if result.stale:
+                con.warn("Out of date: " + ", ".join(result.stale) + " - run `bm build`.")
                 return 1
             con.say("Pages are up to date.")
             return 0
@@ -421,7 +524,8 @@ def run(args: argparse.Namespace, con: Console) -> int:
         ("home", "show"): _show_home, ("button", "list"): _list_buttons, ("ticker", "list"): _list_ticker,
         ("tile", "list"): _list_tiles, ("github", "show"): _show_github, ("repo", "list"): _list_repos,
         ("plans", "show"): _show_plans, ("lane", "list"): _list_lanes, ("plan", "list"): _list_plans,
-        ("step", "list"): _list_steps,
+        ("step", "list"): _list_steps, ("stories", "show"): _show_stories, ("story", "list"): _list_stories,
+        ("blog", "show"): _show_blog, ("post", "list"): _list_posts,
     }
     if (g, a) in views:
         views[(g, a)](cfg.load(site / CONFIG_NAME), con)
@@ -433,11 +537,70 @@ def run(args: argparse.Namespace, con: Console) -> int:
     if (g, a) == ("plan", "info"):
         _info(_all_plan_items(cfg.load(site / CONFIG_NAME)), args.id, "plan", con)
         return 0
+    if (g, a) == ("story", "info"):
+        story = _find(cfg.load(site / CONFIG_NAME)["stories"]["items"], args.id, "story")
+        for key, value in story.items():
+            con.say(f"{key:8} " + (storytext.summary(value) if key == "body" else str(value)))
+        return 0
+    if (g, a) == ("story", "body"):
+        con.out.write(storytext.dump(_find(cfg.load(site / CONFIG_NAME)["stories"]["items"], args.id, "story")["body"]))
+        return 0
+    if (g, a) == ("post", "info"):
+        post = _find(cfg.load(site / CONFIG_NAME)["blog"]["items"], args.id, "post")
+        for key, value in post.items():
+            con.say(f"{key:8} " + (storytext.summary(value) if key == "body" else str(value)))
+        return 0
+    if (g, a) == ("post", "body"):
+        con.out.write(storytext.dump(_find(cfg.load(site / CONFIG_NAME)["blog"]["items"], args.id, "post")["body"]))
+        return 0
     if (g, a) == ("step", "info"):
         _info(cfg.load(site / CONFIG_NAME)["plans"]["roadmap"]["steps"], args.id, "roadmap step", con)
         return 0
 
     # edits
+    if g == "blog":
+        fields = _given(args, ["title", "lead"])
+        return _apply(site, con, lambda c: model.set_blog(c, **fields), nb, "Blog page updated.")
+    if g == "post":
+        if a == "add":
+            body = _read_body(args.body_file)
+            date = args.date or datetime.date.today().isoformat()
+            return _apply(site, con, lambda c: model.add_post(
+                c, id=args.id, title=args.title, date=date, summary=args.summary, body_text=body,
+                tags=_csv(args.tags), visible=not args.hidden), nb, f"Post '{args.id}' added.")
+        if a == "remove":
+            return _apply(site, con, lambda c: model.remove_post(c, args.id), nb, f"Post '{args.id}' removed.")
+        if a == "set":
+            fields = _given(args, ["title", "date", "summary"])
+            if args.tags is not None:
+                fields["tags"] = _csv(args.tags)
+            if args.body_file is not None:
+                fields["body_text"] = _read_body(args.body_file)
+            return _apply(site, con, lambda c: model.update_post(c, args.id, **fields), nb, f"Post '{args.id}' updated.")
+        visible = a == "unhide"
+        return _apply(site, con, lambda c: model.set_post_visible(c, args.id, visible), nb,
+                      f"Post '{args.id}' is now {'published' if visible else 'a draft (its page is removed)'}.")
+    if g == "stories":
+        fields = _given(args, ["title", "lead"])
+        return _apply(site, con, lambda c: model.set_stories(c, **fields), nb, "Stories page updated.")
+    if g == "story":
+        if a == "add":
+            body = _read_body(args.body_file)
+            return _apply(site, con, lambda c: model.add_story(
+                c, id=args.id, title=args.title, body_text=body, kind=args.kind, tag=args.tag, summary=args.summary,
+                aside=args.aside, visible=not args.hidden, position=args.position), nb, f"Story '{args.id}' added.")
+        if a == "remove":
+            return _apply(site, con, lambda c: model.remove_story(c, args.id), nb, f"Story '{args.id}' removed.")
+        if a == "move":
+            return _apply(site, con, lambda c: model.move_story(c, args.id, args.position), nb, f"Story '{args.id}' moved to {args.position}.")
+        if a == "set":
+            fields = _given(args, ["title", "kind", "tag", "summary", "aside"])
+            if args.body_file is not None:
+                fields["body_text"] = _read_body(args.body_file)
+            return _apply(site, con, lambda c: model.update_story(c, args.id, **fields), nb, f"Story '{args.id}' updated.")
+        visible = a == "unhide"
+        return _apply(site, con, lambda c: model.set_story_visible(c, args.id, visible), nb,
+                      f"Story '{args.id}' is now {'published' if visible else 'a draft (its page is removed)'}.")
     if g == "plans":
         fields = {k.replace("-", "_"): v for k, v in _given(args, ["title", "lead", "roadmap-kicker", "roadmap-title", "roadmap-intro"]).items()}
         return _apply(site, con, lambda c: model.set_plans(c, **fields), nb, "Plans page updated.")

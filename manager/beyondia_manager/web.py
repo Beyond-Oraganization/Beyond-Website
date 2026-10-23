@@ -32,12 +32,13 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple
 
 from . import config as cfg
-from . import model, service
+from . import model, service, storytext
 from .build import CONFIG_NAME
 from .errors import ConfigError, EditError, ManagerError
 
 UI_FILE = Path(__file__).resolve().parent / "ui" / "index.html"
-MAX_BODY = 64 * 1024
+MAX_BODY = 1024 * 1024          # a long story is tens of kilobytes; this still stops absurd requests
+UNDO_DEPTH = 50
 PREVIEW_TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".jpg": "image/jpeg"}
 PREVIEW_NAME = re.compile(r"^[A-Za-z0-9_-]+\.(html|css|jpg)$")
 
@@ -102,6 +103,29 @@ OPS: Dict[str, Op] = {
     "step.move": Op(model.move_step, {"step_id": _STR, "position": _INT}, {}),
     "step.update": Op(model.update_step, {"step_id": _STR}, {k: _STR for k in model.STEP_FIELDS}),
     "step.visible": Op(model.set_step_visible, {"step_id": _STR, "visible": _BOOL}, {}),
+    "stories.set": Op(model.set_stories, {}, {k: _STR for k in model.STORIES_FIELDS}),
+    "story.add": Op(
+        model.add_story, {},
+        {"id": _STR, "title": _STR, "body_text": _STR, "kind": _STR, "tag": _STR, "summary": _STR, "aside": _STR,
+         "visible": _BOOL, "position": _INT},
+        required=("id", "title", "body_text", "summary", "aside"),
+    ),
+    "story.remove": Op(model.remove_story, {"story_id": _STR}, {}),
+    "story.move": Op(model.move_story, {"story_id": _STR, "position": _INT}, {}),
+    "story.update": Op(model.update_story, {"story_id": _STR}, {k: _STR for k in model.STORY_FIELDS}),
+    "story.visible": Op(model.set_story_visible, {"story_id": _STR, "visible": _BOOL}, {}),
+    "blog.set": Op(model.set_blog, {}, {k: _STR for k in model.BLOG_FIELDS}),
+    "post.add": Op(
+        model.add_post, {},
+        {"id": _STR, "title": _STR, "date": _STR, "summary": _STR, "body_text": _STR, "tags": _STRS, "visible": _BOOL},
+        required=("id", "title", "date", "summary", "body_text"),
+    ),
+    "post.remove": Op(model.remove_post, {"post_id": _STR}, {}),
+    "post.update": Op(
+        model.update_post, {"post_id": _STR},
+        {"title": _STR, "date": _STR, "tags": _STRS, "summary": _STR, "body_text": _STR},
+    ),
+    "post.visible": Op(model.set_post_visible, {"post_id": _STR, "visible": _BOOL}, {}),
     "github.set": Op(model.set_github, {}, {k: _STR for k in model.GITHUB_FIELDS}),
     "repo.add": Op(
         model.add_repo, {},
@@ -156,16 +180,48 @@ class App:
     def __init__(self, site: Path):
         self.site = Path(site)
         self.warnings: list = []
+        self.history: list = []          # (config before, config after) of our own edits, newest last
 
     def state(self) -> Dict[str, Any]:
         status = service.site_status(self.site)
         config = None
+        texts: Dict[str, str] = {}
+        post_texts: Dict[str, str] = {}
         if status["valid"]:
             config = cfg.load(self.site / CONFIG_NAME)
-        return {"config": config, "status": status}
+            texts = {s["id"]: storytext.dump(s["body"]) for s in config["stories"]["items"]}
+            post_texts = {p["id"]: storytext.dump(p["body"]) for p in config["blog"]["items"]}
+        return {"config": config, "status": status, "story_texts": texts, "post_texts": post_texts, "undo": len(self.history)}
 
     def edit(self, op: Any, params: Any) -> Dict[str, Any]:
-        service.apply_edit(self.site, build_edit(op, params), on_stale=self.warnings.append)
+        change = build_edit(op, params)
+        seen: Dict[str, Any] = {}
+
+        def recorded(config: Dict[str, Any]) -> Dict[str, Any]:
+            seen["before"] = config
+            seen["after"] = change(config)
+            return seen["after"]
+
+        service.apply_edit(self.site, recorded, on_stale=self.warnings.append)
+        self.history.append((seen["before"], seen["after"]))
+        del self.history[:-UNDO_DEPTH]
+        return self.state()
+
+    def undo(self) -> Dict[str, Any]:
+        if not self.history:
+            raise EditError("there is nothing to undo")
+        before, after = self.history[-1]
+
+        def restore(config: Dict[str, Any]) -> Dict[str, Any]:
+            if config != after:
+                raise EditError(
+                    "the config was changed by something else (the command line or a text editor) since your last "
+                    "action here, so undo would overwrite that work. Nothing was changed"
+                )
+            return before
+
+        service.apply_edit(self.site, restore, on_stale=self.warnings.append)
+        self.history.pop()
         return self.state()
 
     def build(self) -> Dict[str, Any]:
@@ -277,6 +333,7 @@ class Handler(BaseHTTPRequestHandler):
         routes: Dict[str, Callable[[], Dict[str, Any]]] = {
             "/api/edit": lambda: app.edit(body.get("op"), body.get("params", {})),
             "/api/build": app.build,
+            "/api/undo": app.undo,
             "/api/publish": lambda: app.publish(body.get("message"), body.get("dry_run")),
         }
         route = routes.get(self.path.split("?", 1)[0])

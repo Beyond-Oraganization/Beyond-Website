@@ -66,8 +66,9 @@ class ServerCase(TempDirCase):
 
 class OperationTableTests(unittest.TestCase):
     def test_every_operation_the_interface_uses_exists(self):
-        used = set(re.findall(r'edit\("([a-z]+\.[a-z]+)"', UI_SOURCE)) | set(re.findall(r'(?:move|visible|remove|update): "([a-z]+\.[a-z]+)"', UI_SOURCE))
-        self.assertTrue(len(used) >= 12, used)
+        prefixes = "home|button|ticker|tile|plans|lane|plan|step|stories|story|blog|post|github|repo"
+        used = set(re.findall(r'"((?:%s)\.(?!html")[a-z]+)"' % prefixes, UI_SOURCE))
+        self.assertTrue(len(used) >= 30, used)
         self.assertEqual(sorted(used - set(web.OPS)), [])
 
     def test_every_operation_is_used_by_the_interface(self):
@@ -115,12 +116,12 @@ class StateAndEditTests(ServerCase):
             ("button.remove", {"position": 3}),
             ("ticker.add", {"text": "Fresh phrase"}),
             ("ticker.remove", {"position": 5}),
-            ("tile.add", {"id": "blog", "label": "Blog", "title": "Road notes", "text": "Posts.", "href": "stories.html", "position": 1}),
-            ("tile.move", {"tile_id": "blog", "position": 2}),
-            ("tile.update", {"tile_id": "blog", "title": "Road notes 2"}),
-            ("tile.visible", {"tile_id": "blog", "visible": False}),
-            ("tile.visible", {"tile_id": "blog", "visible": True}),
-            ("tile.remove", {"tile_id": "blog"}),
+            ("tile.add", {"id": "journal", "label": "Journal", "title": "Road notes", "text": "Posts.", "href": "stories.html", "position": 1}),
+            ("tile.move", {"tile_id": "journal", "position": 2}),
+            ("tile.update", {"tile_id": "journal", "title": "Road notes 2"}),
+            ("tile.visible", {"tile_id": "journal", "visible": False}),
+            ("tile.visible", {"tile_id": "journal", "visible": True}),
+            ("tile.remove", {"tile_id": "journal"}),
             ("github.set", {"title": "Open source."}),
             ("repo.add", {"id": "docs", "name": "Docs", "url": "https://github.com/Beyond-Oraganization/Docs", "description": "Documents.", "stack": ["Markdown"], "page": None}),
             ("repo.move", {"repo_id": "docs", "position": 1}),
@@ -172,6 +173,139 @@ class StateAndEditTests(ServerCase):
         for text in ("New plans title.", "New road.", "Thoughts", "Launch day", "Winter"):
             self.assertIn(text, html)
         self.assertEqual(self.client.edit("lane.remove", {"lane_id": "building"})[0], 409)     # still has plans
+
+    def test_story_operations_end_to_end(self):
+        steps = [
+            ("stories.set", {"title": "New stories title."}),
+            ("story.add", {"id": "lighthouse", "title": "The Lighthouse", "summary": "A keeper.", "aside": "A light.", "body_text": "A keeper lived alone.\n\nThe light stayed.", "tag": "Myth"}),
+            ("story.update", {"story_id": "lighthouse", "title": "The Old Lighthouse", "body_text": "# One\n\n[1:1] A verse."}),
+            ("story.update", {"story_id": "lighthouse", "kind": "verses"}),
+            ("story.move", {"story_id": "lighthouse", "position": 1}),
+            ("story.visible", {"story_id": "lighthouse", "visible": False}),
+            ("story.visible", {"story_id": "lighthouse", "visible": True}),
+            ("story.remove", {"story_id": "lighthouse"}),
+        ]
+        for op, params in steps:
+            with self.subTest(op=op):
+                status, body = self.client.edit(op, params)
+                self.assertEqual(status, 200, body)
+                self.assertEqual(body["status"]["stale"], [])
+                self.assertEqual(body["status"]["site_problems"], [])
+        self.assertFalse((self.site / "storylighthouse.html").exists())
+        self.assertIn("New stories title.", (self.site / "stories.html").read_text(encoding="utf-8"))
+
+    def test_blog_operations_end_to_end(self):
+        steps = [
+            ("blog.set", {"title": "New blog title."}),
+            ("post.add", {"id": "autumn", "title": "Autumn", "date": "2026-10-25", "summary": "Leaves.", "body_text": "Leaves fall.\n\nSee [home](index.html).", "tags": ["News"]}),
+            ("post.update", {"post_id": "autumn", "title": "Late autumn", "date": "2026-11-01", "tags": ["News", "Ideas"], "body_text": "New text."}),
+            ("post.visible", {"post_id": "autumn", "visible": False}),
+            ("post.visible", {"post_id": "autumn", "visible": True}),
+            ("post.remove", {"post_id": "autumn"}),
+        ]
+        for op, params in steps:
+            with self.subTest(op=op):
+                status, body = self.client.edit(op, params)
+                self.assertEqual(status, 200, body)
+                self.assertEqual(body["status"]["stale"], [])
+                self.assertEqual(body["status"]["site_problems"], [])
+        self.assertFalse((self.site / "blog-autumn.html").exists())
+        self.assertIn("New blog title.", (self.site / "blog.html").read_text(encoding="utf-8"))
+
+    def test_state_carries_the_editable_text_of_every_post(self):
+        data = self.client.state()
+        self.assertEqual(set(data["post_texts"]), {p["id"] for p in data["config"]["blog"]["items"]})
+        self.assertIn("](https://github.com/Beyond-Oraganization)", data["post_texts"]["welcome"])
+
+    def test_bad_post_requests_are_refused(self):
+        for params in ({"id": "x", "title": "t", "date": "2026-02-30", "summary": "s", "body_text": "b"},
+                       {"id": "x", "title": "t", "date": "2026-10-01", "summary": "s", "body_text": "[x](javascript:alert(1))"},
+                       {"id": "x", "title": "t", "date": "2026-10-01", "summary": "s", "body_text": "b", "tags": "a,b"},       # wrong type
+                       {"id": "x", "title": "t", "date": "2026-10-01", "summary": "s"}):                                    # missing body
+            with self.subTest(params=params):
+                self.assertEqual(self.client.edit("post.add", params)[0], 409)
+        self.assertFalse((self.site / "blog-x.html").exists())
+
+    def test_undo_a_post_removal_brings_the_page_back(self):
+        self.client.edit("post.remove", {"post_id": "welcome"})
+        self.assertFalse((self.site / "blog-welcome.html").exists())
+        self.client.post("/api/undo", {})
+        self.assertTrue((self.site / "blog-welcome.html").exists())
+
+    def test_state_carries_the_editable_text_of_every_story(self):
+        data = self.client.state()
+        self.assertEqual(set(data["story_texts"]), {s["id"] for s in data["config"]["stories"]["items"]})
+        self.assertIn("[1:1]", data["story_texts"]["roman"])
+        from beyondia_manager import storytext
+        self.assertEqual(storytext.parse(data["story_texts"]["roman"]), next(s for s in data["config"]["stories"]["items"] if s["id"] == "roman")["body"])
+
+    def test_a_bad_story_body_is_refused_with_the_line_number(self):
+        status, body = self.client.edit("story.update", {"story_id": "angel", "body_text": "Fine.\n\n+ stray"})
+        self.assertEqual(status, 409)
+        self.assertIn("line 3", body["error"])
+
+    def test_a_long_story_fits_in_a_request(self):
+        text = "\n\n".join("Paragraph %d. " % i + "word " * 200 for i in range(200))             # about 200 KB
+        status, body = self.client.edit("story.update", {"story_id": "angel", "body_text": text})
+        self.assertEqual(status, 200, body)
+        angel = next(s for s in body["config"]["stories"]["items"] if s["id"] == "angel")
+        self.assertEqual(len(angel["body"]), 200)
+
+    # --- undo ---
+    def test_undo_restores_the_previous_state_and_the_pages(self):
+        before = (self.site / "index.html").read_bytes()
+        self.client.edit("tile.visible", {"tile_id": "creator", "visible": False})
+        self.assertNotEqual((self.site / "index.html").read_bytes(), before)
+        status, body = self.client.post("/api/undo", {})
+        self.assertEqual(status, 200, body)
+        self.assertEqual((self.site / "index.html").read_bytes(), before)
+        self.assertEqual(body["undo"], 0)
+
+    def test_undo_walks_back_several_steps(self):
+        original = self.client.state()["config"]
+        self.client.edit("home.set", {"title": "One"})
+        self.client.edit("home.set", {"title": "Two"})
+        self.assertEqual(self.client.state()["undo"], 2)
+        self.client.post("/api/undo", {})
+        self.assertEqual(self.client.state()["config"]["home"]["title"], "One")
+        self.client.post("/api/undo", {})
+        self.assertEqual(self.client.state()["config"], original)
+
+    def test_undo_a_story_removal_brings_the_page_back(self):
+        self.client.edit("story.remove", {"story_id": "roman"})
+        self.assertFalse((self.site / "storyroman.html").exists())
+        self.client.post("/api/undo", {})
+        self.assertTrue((self.site / "storyroman.html").exists())
+
+    def test_nothing_to_undo(self):
+        status, body = self.client.post("/api/undo", {})
+        self.assertEqual(status, 409)
+        self.assertIn("nothing to undo", body["error"])
+
+    def test_a_refused_edit_leaves_no_undo_step(self):
+        self.client.edit("tile.remove", {"tile_id": "nope"})
+        self.assertEqual(self.client.state()["undo"], 0)
+
+    def test_undo_refuses_to_overwrite_work_done_elsewhere(self):
+        self.client.edit("home.set", {"title": "Mine"})
+        import io
+        from beyondia_manager import cli
+        cli.main(["--site-dir", str(self.site), "home", "set", "--lead", "Changed on the command line."], out=io.StringIO(), err=io.StringIO())
+        status, body = self.client.post("/api/undo", {})
+        self.assertEqual(status, 409)
+        self.assertIn("changed by something else", body["error"])
+        self.assertEqual(self.client.state()["config"]["home"]["lead"], "Changed on the command line.")
+        self.assertEqual(self.client.state()["config"]["home"]["title"], "Mine")
+
+    def test_undo_needs_the_token_like_every_other_post(self):
+        self.client.edit("home.set", {"title": "Mine"})
+        self.assertEqual(self.client.post("/api/undo", {}, token="wrong")[0], 403)
+        self.assertEqual(self.client.state()["config"]["home"]["title"], "Mine")
+
+    def test_undo_history_is_bounded(self):
+        for i in range(web.UNDO_DEPTH + 5):
+            self.client.edit("home.set", {"title": f"T{i}"})
+        self.assertEqual(self.client.state()["undo"], web.UNDO_DEPTH)
 
     def test_the_interface_and_the_command_line_agree(self):
         self.client.edit("tile.visible", {"tile_id": "creator", "visible": False})
@@ -266,7 +400,13 @@ class SecurityTests(ServerCase):
         h = {"X-BM-Token": TOKEN, "Content-Type": "application/json"}
         self.assertEqual(self.client.request("POST", "/api/edit", raw=b"{not json", headers=h)[0], 400)
         self.assertEqual(self.client.request("POST", "/api/edit", raw=b"[1,2]", headers=h)[0], 400)
-        self.assertEqual(self.client.request("POST", "/api/edit", raw=b"x" * (web.MAX_BODY + 1), headers=h)[0], 413)
+        conn = http.client.HTTPConnection("127.0.0.1", self.client.port, timeout=10)     # declare a huge body, send none
+        conn.putrequest("POST", "/api/edit", skip_host=True)
+        for key, value in {"Host": f"127.0.0.1:{self.client.port}", "Content-Length": str(web.MAX_BODY + 1), **h}.items():
+            conn.putheader(key, value)
+        conn.endheaders()
+        self.assertEqual(conn.getresponse().status, 413)
+        conn.close()
 
     def test_unknown_routes(self):
         self.assertEqual(self.client.request("GET", "/nope")[0], 404)

@@ -70,26 +70,26 @@ class ReadCommandTests(CliCase):
 
 class EditCommandTests(CliCase):
     def test_tile_lifecycle_updates_config_and_page(self):
-        self.ok("tile", "add", "blog", "--label", "Blog", "--title", "Notes from the road",
+        self.ok("tile", "add", "journal", "--label", "Journal", "--title", "Notes from the road",
                 "--text", "Short posts.", "--href", "stories.html", "--position", "2")
-        self.assertEqual([t["id"] for t in self.config()["home"]["map"]["tiles"]][:3], ["stories", "blog", "conclusions"])
+        self.assertEqual([t["id"] for t in self.config()["home"]["map"]["tiles"]][:3], ["stories", "journal", "blog"])
         self.assertIn("Notes from the road", self.page("index.html"))
+        self.assertIn("Ten doors", self.page("index.html"))
+
+        self.ok("tile", "hide", "journal")
+        self.assertNotIn("Notes from the road", self.page("index.html"))
         self.assertIn("Nine doors", self.page("index.html"))
 
-        self.ok("tile", "hide", "blog")
-        self.assertNotIn("Notes from the road", self.page("index.html"))
-        self.assertIn("Eight doors", self.page("index.html"))
+        self.ok("tile", "unhide", "journal")
+        self.ok("tile", "move", "journal", "1")
+        self.assertEqual(self.config()["home"]["map"]["tiles"][0]["id"], "journal")
 
-        self.ok("tile", "unhide", "blog")
-        self.ok("tile", "move", "blog", "1")
-        self.assertEqual(self.config()["home"]["map"]["tiles"][0]["id"], "blog")
-
-        self.ok("tile", "set", "blog", "--title", "Road notes")
+        self.ok("tile", "set", "journal", "--title", "Road notes")
         self.assertIn("Road notes", self.page("index.html"))
 
-        self.ok("tile", "remove", "blog")
+        self.ok("tile", "remove", "journal")
         self.assertNotIn("Road notes", self.page("index.html"))
-        self.assertIn("Eight doors", self.page("index.html"))
+        self.assertIn("Nine doors", self.page("index.html"))
         self.assertIn("up to date", self.ok("build", "--check"))
 
     def test_repo_lifecycle_updates_the_github_page(self):
@@ -317,6 +317,171 @@ class PlansCommandTests(CliCase):
             ("plan", "remove", "nope"), ("plan", "move", "treatise", "9"), ("plan", "to-lane", "treatise", "nope"),
             ("plan", "set", "treatise", "--status", "x" * 40), ("step", "remove", "nope"),
             ("step", "add", "new-edit", "--when", "w", "--title", "t", "--text", "t", "--status", "s"),
+        ):
+            with self.subTest(argv=argv):
+                self.fails(*argv)
+                self.assertEqual({p.name: p.read_bytes() for p in self.site.iterdir() if p.is_file()}, before)
+
+
+class StoryCommandTests(CliCase):
+    def write(self, name, text):
+        path = self.tmp / name
+        path.write_text(text, encoding="utf-8")
+        return str(path)
+
+    def test_listings(self):
+        out = self.ok("story", "list")
+        self.assertIn("angel", out)
+        self.assertIn("[verses]", out)
+        self.assertIn("storyangel.html", out)
+        self.assertIn("The Angel Beyond", self.ok("story", "info", "angel"))
+        self.assertIn("Myths that carry", self.ok("stories", "show"))
+        self.assertIn("no story", self.fails("story", "info", "nope"))
+
+    def test_the_body_round_trips_through_a_file_without_changes(self):
+        body = self.ok("story", "body", "roman")
+        self.assertIn("[1:1]", body)
+        before = self.page("storyroman.html")
+        self.ok("story", "set", "roman", "--body-file", self.write("roman.txt", body))
+        self.assertEqual(self.page("storyroman.html"), before)
+        self.assertIn("up to date", self.ok("build", "--check"))
+
+    def test_add_edit_move_hide_remove(self):
+        self.ok("story", "add", "lighthouse", "--title", "The Lighthouse", "--summary", "A keeper and a light.", "--aside", "A light that stays.",
+                "--tag", "Myth", "--body-file", self.write("l.txt", "A keeper lived alone.\n\nThe light never went out."))
+        self.assertIn("A keeper lived alone.", self.page("storylighthouse.html"))
+        self.assertIn("The Lighthouse", self.page("stories.html"))
+        self.assertIn("Eight stories so far", self.page("index.html"))
+        self.assertIn("Rooms: eight stories", self.page("index.html"))
+        self.assertIn("storylighthouse.html", self.page("storyroman.html"))                      # the previous last story now has a next
+
+        self.ok("story", "set", "lighthouse", "--title", "The Old Lighthouse", "--body-file", self.write("l2.txt", "A new text."))
+        self.assertIn("The Old Lighthouse", self.page("storylighthouse.html"))
+        self.assertIn("A new text.", self.page("storylighthouse.html"))
+        self.assertNotIn("A keeper lived alone.", self.page("storylighthouse.html"))
+
+        self.ok("story", "move", "lighthouse", "1")
+        self.assertEqual(self.config()["stories"]["items"][0]["id"], "lighthouse")
+
+        self.ok("story", "hide", "lighthouse")
+        self.assertFalse((self.site / "storylighthouse.html").exists())
+        self.assertNotIn("The Old Lighthouse", self.page("stories.html"))
+        self.assertIn("Seven stories so far", self.page("index.html"))
+        self.ok("story", "unhide", "lighthouse")
+        self.assertTrue((self.site / "storylighthouse.html").exists())
+
+        self.ok("story", "remove", "lighthouse")
+        self.assertFalse((self.site / "storylighthouse.html").exists())
+        self.assertIn("up to date", self.ok("build", "--check"))
+        self.assertIn("passed", self.ok("check"))
+
+    def test_body_from_standard_input(self):
+        import sys
+        old = sys.stdin
+        sys.stdin = io.StringIO("From stdin.")
+        try:
+            self.ok("story", "add", "piped", "--title", "Piped", "--summary", "s", "--aside", "a", "--body-file", "-")
+        finally:
+            sys.stdin = old
+        self.assertIn("From stdin.", self.page("storypiped.html"))
+
+    def test_the_stories_page_text(self):
+        self.ok("stories", "set", "--title", "New stories title.")
+        self.assertIn("New stories title.", self.page("stories.html"))
+
+    def test_removing_a_story_leaves_a_hand_written_page_alone(self):
+        marker = [l for l in self.page("storygirl.html").splitlines() if "Generated by" in l][0]
+        (self.site / "storymine.html").write_text(self.page("storygirl.html").replace(marker, "<!-- mine -->"), encoding="utf-8")
+        self.ok("story", "remove", "girl")
+        self.assertFalse((self.site / "storygirl.html").exists())
+        self.assertTrue((self.site / "storymine.html").exists())
+
+    def test_refusals_change_nothing(self):
+        before = {p.name: p.read_bytes() for p in self.site.iterdir() if p.is_file()}
+        ok_body = self.write("ok.txt", "Text.")
+        for argv in (
+            ("story", "add", "angel", "--title", "t", "--summary", "s", "--aside", "a", "--body-file", ok_body),               # duplicate id
+            ("story", "add", "x", "--title", "t", "--summary", "s", "--aside", "a", "--body-file", self.write("e.txt", "  \n")),   # empty body
+            ("story", "add", "x", "--title", "t", "--summary", "s", "--aside", "a", "--body-file", self.write("p.txt", "+ stray")),
+            ("story", "add", "x", "--title", "t", "--summary", "s", "--aside", "a", "--body-file", str(self.tmp / "missing.txt")),
+            ("story", "add", "Bad Id", "--title", "t", "--summary", "s", "--aside", "a", "--body-file", ok_body),
+            ("story", "set", "angel", "--title", ""), ("story", "set", "nope", "--title", "x"), ("story", "move", "angel", "99"),
+            ("story", "remove", "nope"), ("story", "hide", "nope"),
+        ):
+            with self.subTest(argv=argv):
+                self.fails(*argv)
+                self.assertEqual({p.name: p.read_bytes() for p in self.site.iterdir() if p.is_file()}, before)
+
+    def test_invalid_kind_is_a_usage_error(self):
+        self.assertEqual(run(self.site, "story", "set", "angel", "--kind", "poem")[0], 2)
+
+
+class BlogCommandTests(CliCase):
+    def write(self, name, text):
+        path = self.tmp / name
+        path.write_text(text, encoding="utf-8")
+        return str(path)
+
+    def test_listings(self):
+        out = self.ok("post", "list")
+        self.assertIn("blog-welcome.html", out)
+        self.assertIn("[draft]", out)
+        self.assertIn("2026-10-20", out.splitlines()[0])                       # newest first
+        self.assertIn("Welcome to the blog", self.ok("post", "info", "welcome"))
+        self.assertIn("Notes from the country", self.ok("blog", "show"))
+        self.assertIn("no post", self.fails("post", "info", "nope"))
+
+    def test_the_body_round_trips_without_changes(self):
+        body = self.ok("post", "body", "welcome")
+        self.assertIn("[GitHub](https://github.com/Beyond-Oraganization)", body)
+        before = self.page("blog-welcome.html")
+        self.ok("post", "set", "welcome", "--body-file", self.write("w.txt", body))
+        self.assertEqual(self.page("blog-welcome.html"), before)
+        self.assertIn("up to date", self.ok("build", "--check"))
+
+    def test_add_edit_hide_remove(self):
+        self.ok("post", "add", "autumn", "--title", "Autumn notes", "--summary", "Leaves.", "--date", "2026-10-25", "--tags", "News, Ideas",
+                "--body-file", self.write("a.txt", "Leaves fall. See [home](index.html).\n\n## Later\n\nMore."))
+        page = self.page("blog-autumn.html")
+        self.assertIn("Autumn notes", page)
+        self.assertIn('<a href="index.html">home</a>', page)
+        self.assertIn("25 October 2026", page)
+        self.assertIn("Autumn notes", self.page("blog.html"))
+        self.assertLess(self.page("blog.html").index("Autumn notes"), self.page("blog.html").index("A second note"))   # newest first
+
+        self.ok("post", "set", "autumn", "--title", "Late autumn", "--date", "2026-09-01", "--tags", "News", "--body-file", self.write("b.txt", "New text."))
+        self.assertIn("Late autumn", self.page("blog-autumn.html"))
+        self.assertIn("1 September 2026", self.page("blog-autumn.html"))
+        self.assertGreater(self.page("blog.html").index("Late autumn"), self.page("blog.html").index("A second note"))
+
+        self.ok("post", "hide", "autumn")
+        self.assertFalse((self.site / "blog-autumn.html").exists())
+        self.ok("post", "unhide", "autumn")
+        self.assertTrue((self.site / "blog-autumn.html").exists())
+        self.ok("post", "remove", "autumn")
+        self.assertFalse((self.site / "blog-autumn.html").exists())
+        self.assertIn("up to date", self.ok("build", "--check"))
+        self.assertIn("passed", self.ok("check"))
+
+    def test_default_date_is_today(self):
+        import datetime
+        self.ok("post", "add", "today", "--title", "Today", "--summary", "s", "--body-file", self.write("t.txt", "Text."))
+        self.assertEqual(next(p for p in self.config()["blog"]["items"] if p["id"] == "today")["date"], datetime.date.today().isoformat())
+
+    def test_the_blog_page_text(self):
+        self.ok("blog", "set", "--title", "New blog title.")
+        self.assertIn("New blog title.", self.page("blog.html"))
+
+    def test_refusals_change_nothing(self):
+        before = {p.name: p.read_bytes() for p in self.site.iterdir() if p.is_file()}
+        ok_body = self.write("ok.txt", "Text.")
+        base = ("--title", "t", "--summary", "s", "--body-file", ok_body)
+        for argv in (
+            ("post", "add", "welcome") + base, ("post", "add", "x", "--date", "2026-02-30") + base, ("post", "add", "x", "--date", "tomorrow") + base,
+            ("post", "add", "x", "--tags", "a,b,c,d,e") + base, ("post", "add", "Bad Id") + base,
+            ("post", "add", "x", "--title", "t", "--summary", "s", "--body-file", self.write("c.txt", "# Chapter")),
+            ("post", "add", "x", "--title", "t", "--summary", "s", "--body-file", self.write("l.txt", "[x](javascript:alert(1))")),
+            ("post", "set", "welcome", "--title", ""), ("post", "set", "nope", "--title", "x"), ("post", "remove", "nope"), ("post", "hide", "nope"),
         ):
             with self.subTest(argv=argv):
                 self.fails(*argv)

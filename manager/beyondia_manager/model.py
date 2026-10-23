@@ -455,3 +455,172 @@ def set_step_visible(config: Config, step_id: str, visible: bool) -> Config:
     steps = _steps(new)
     steps[_index_of(steps, step_id, "roadmap step")]["visible"] = visible
     return _finish(new)
+
+
+# --------------------------------------------------------------------------
+# stories
+# --------------------------------------------------------------------------
+
+STORIES_FIELDS = {"title": ("stories", "title"), "lead": ("stories", "lead")}
+STORY_FIELDS = ("title", "kind", "tag", "summary", "aside", "body_text")
+
+
+def _stories(config: Config) -> List[Dict[str, Any]]:
+    return config["stories"]["items"]
+
+
+def story_file_for(story_id: str) -> str:
+    return "story" + story_id.replace("-", "") + ".html"
+
+
+def _parsed_body(body_text: str):
+    from . import storytext
+    return storytext.parse(body_text)
+
+
+def set_stories(config: Config, **fields: str) -> Config:
+    _only_known(fields, STORIES_FIELDS, "stories page")
+    new = copy.deepcopy(config)
+    for name, value in fields.items():
+        new["stories"][STORIES_FIELDS[name][1]] = value
+    return _finish(new)
+
+
+def add_story(
+    config: Config,
+    *,
+    id: str,
+    title: str,
+    body_text: str,
+    kind: str = "story",
+    tag: str = "Story",
+    summary: str,
+    aside: str,
+    visible: bool = True,
+    position: Optional[int] = None,
+) -> Config:
+    new = copy.deepcopy(config)
+    _ensure_new_id(_stories(new), id, "story")
+    file = story_file_for(id)
+    if any(s.get("file") == file for s in _stories(new)):
+        raise EditError(f"the page name '{file}' is already used by another story; choose a different id")
+    story = {
+        "id": id, "file": file, "title": title, "kind": kind, "tag": tag, "summary": summary,
+        "aside": aside, "visible": visible, "body": _parsed_body(body_text),
+    }
+    _insert(_stories(new), story, position)
+    return _finish(new)
+
+
+def remove_story(config: Config, story_id: str) -> Config:
+    new = copy.deepcopy(config)
+    items = _stories(new)
+    del items[_index_of(items, story_id, "story")]
+    return _finish(new)
+
+
+def move_story(config: Config, story_id: str, position: int) -> Config:
+    new = copy.deepcopy(config)
+    items = _stories(new)
+    index = _index_of(items, story_id, "story")
+    target = _check_position(items, position, "story slot")
+    items.insert(target, items.pop(index))
+    return _finish(new)
+
+
+def update_story(config: Config, story_id: str, **fields: str) -> Config:
+    _only_known(fields, STORY_FIELDS, "story")
+    new = copy.deepcopy(config)
+    items = _stories(new)
+    story = items[_index_of(items, story_id, "story")]
+    for name, value in fields.items():
+        if name == "body_text":
+            story["body"] = _parsed_body(value)
+        else:
+            story[name] = value
+    return _finish(new)
+
+
+def set_story_visible(config: Config, story_id: str, visible: bool) -> Config:
+    new = copy.deepcopy(config)
+    items = _stories(new)
+    items[_index_of(items, story_id, "story")]["visible"] = visible
+    return _finish(new)
+
+
+# --------------------------------------------------------------------------
+# blog
+# --------------------------------------------------------------------------
+
+BLOG_FIELDS = {"title": ("blog", "title"), "lead": ("blog", "lead")}
+POST_FIELDS = ("title", "date", "tags", "summary", "body_text")
+
+
+def _posts(config: Config) -> List[Dict[str, Any]]:
+    return config["blog"]["items"]
+
+
+def post_file_for(post_id: str) -> str:
+    return "blog-" + post_id + ".html"
+
+
+def _clean_tags(tags: Iterable[str]) -> List[str]:
+    return [t.strip() for t in tags if isinstance(t, str) and t.strip()]
+
+
+def set_blog(config: Config, **fields: str) -> Config:
+    _only_known(fields, BLOG_FIELDS, "blog page")
+    new = copy.deepcopy(config)
+    for name, value in fields.items():
+        new["blog"][BLOG_FIELDS[name][1]] = value
+    return _finish(new)
+
+
+def add_post(
+    config: Config,
+    *,
+    id: str,
+    title: str,
+    date: str,
+    summary: str,
+    body_text: str,
+    tags: Iterable[str] = (),
+    visible: bool = True,
+) -> Config:
+    new = copy.deepcopy(config)
+    _ensure_new_id(_posts(new), id, "post")
+    post = {
+        "id": id, "file": post_file_for(id), "title": title, "date": date, "tags": _clean_tags(tags),
+        "summary": summary, "visible": visible, "body": _parsed_body(body_text),
+    }
+    _posts(new).append(post)
+    return _finish(new)
+
+
+def remove_post(config: Config, post_id: str) -> Config:
+    new = copy.deepcopy(config)
+    items = _posts(new)
+    del items[_index_of(items, post_id, "post")]
+    return _finish(new)
+
+
+def update_post(config: Config, post_id: str, **fields: Any) -> Config:
+    _only_known(fields, POST_FIELDS, "post")
+    new = copy.deepcopy(config)
+    items = _posts(new)
+    post = items[_index_of(items, post_id, "post")]
+    for name, value in fields.items():
+        if name == "body_text":
+            post["body"] = _parsed_body(value)
+        elif name == "tags":
+            post["tags"] = _clean_tags(value)
+        else:
+            post[name] = value
+    return _finish(new)
+
+
+def set_post_visible(config: Config, post_id: str, visible: bool) -> Config:
+    new = copy.deepcopy(config)
+    items = _posts(new)
+    items[_index_of(items, post_id, "post")]["visible"] = visible
+    return _finish(new)
