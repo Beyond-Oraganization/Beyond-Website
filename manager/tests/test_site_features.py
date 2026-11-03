@@ -12,6 +12,11 @@ from .helpers import SITE_DIR, TempDirCase, copy_real_site, sample
 URL = "https://example.org/site/"
 
 
+def unstamp(text):
+    """Pages on disk carry ?v=<hash> on their asset links (added by the build after syncing)."""
+    return re.sub(r"\?v=[0-9a-f]+", "", text)
+
+
 def with_url():
     c = sample()
     c["site"]["url"] = URL
@@ -214,7 +219,8 @@ class ChromeSyncTests(TempDirCase):
         self.config = cfg.load(SITE_DIR / "site.config.json")
 
     def sync(self, name, text):
-        return chrome.sync_page(self.config, name, text)
+        synced = chrome.sync_page(self.config, name, text)
+        return None if synced is None else unstamp(synced)
 
     def test_sync_is_idempotent(self):
         for name in ("ideology.html", "treatise.html", "creator.html"):
@@ -227,7 +233,7 @@ class ChromeSyncTests(TempDirCase):
         for name in ("community.html", "conclusions.html", "creator.html", "ideology.html", "principles.html",
                      "rules.html", "techbot.html", "technologies.html", "techsales.html", "treatise.html"):
             with self.subTest(name=name):
-                text = (self.site / name).read_text(encoding="utf-8")
+                text = unstamp((self.site / name).read_text(encoding="utf-8"))
                 self.assertEqual(self.sync(name, text), text)
 
     def test_content_is_untouched(self):
@@ -239,7 +245,7 @@ class ChromeSyncTests(TempDirCase):
         self.assertEqual(re.search(r'<main[^>]*>\s*(.*?)\s*</main>', new, re.S).group(1), body.replace("</section>", "<!-- my note --></section>", 1))
 
     def test_navigation_change_reaches_every_page(self):
-        text = (self.site / "rules.html").read_text(encoding="utf-8")
+        text = unstamp((self.site / "rules.html").read_text(encoding="utf-8"))
         old = text.replace('<li><a href="blog.html" class="">BLOG</a></li>', "")
         self.assertNotEqual(old, text)
         self.assertEqual(self.sync("rules.html", old), text)
@@ -251,7 +257,7 @@ class ChromeSyncTests(TempDirCase):
         self.assertEqual(re.findall(r'class="on" aria-current="page">([A-Z]+)<', new), ["IDEOLOGY"])
 
     def test_a_missing_description_comes_from_the_lead(self):
-        text = (self.site / "creator.html").read_text(encoding="utf-8")
+        text = unstamp((self.site / "creator.html").read_text(encoding="utf-8"))
         stripped = re.sub(r'<meta name="description"[^>]*>\n', "", text)
         self.assertEqual(self.sync("creator.html", stripped), text)
 
@@ -280,6 +286,41 @@ class ChromeSyncTests(TempDirCase):
         names = builder.synced_page_names(self.site, config)
         self.assertIn("treatise.html", names)
         self.assertNotIn("index.html", names)
+
+
+class AssetVersionTests(TempDirCase):
+    """New pages must never be shown with an old cached stylesheet or script."""
+
+    def test_stamp_adds_and_replaces_versions(self):
+        html = '<link rel="stylesheet" href="beyondia.css"><script src="beyondia.js?v=0123456789" defer></script>'
+        out = builder.stamp_assets(html, {"beyondia.css": "aaaaaaaaaa", "beyondia.js": "bbbbbbbbbb"})
+        self.assertEqual(out, '<link rel="stylesheet" href="beyondia.css?v=aaaaaaaaaa"><script src="beyondia.js?v=bbbbbbbbbb" defer></script>')
+        self.assertEqual(builder.stamp_assets(out, {"beyondia.css": "aaaaaaaaaa", "beyondia.js": "bbbbbbbbbb"}), out)
+
+    def test_a_stylesheet_change_makes_every_page_stale(self):
+        site = copy_real_site(self.tmp / "site")
+        config = cfg.load(site / "site.config.json")
+        css = site / "beyondia.css"
+        css.write_text(css.read_text(encoding="utf-8") + "\n/* changed */\n", encoding="utf-8")
+        stale = builder.build(site, config, check=True).changed
+        self.assertIn("index.html", stale)
+        self.assertIn("treatise.html", stale)
+        builder.build(site, config)
+        version = builder.asset_version(css.read_bytes())
+        self.assertIn(f'href="beyondia.css?v={version}"', (site / "treatise.html").read_text(encoding="utf-8"))
+
+    def test_the_real_pages_link_the_current_versions(self):
+        for name in ("beyondia.css", "beyondia.js", "search-index.js"):
+            version = builder.asset_version((SITE_DIR / name).read_bytes())
+            page = "search.html" if name == "search-index.js" else "index.html"
+            self.assertIn(f"{name}?v={version}", (SITE_DIR / page).read_text(encoding="utf-8"), name)
+
+    def test_icons_have_a_size_without_css(self):
+        header = render.render_header()
+        for svg in re.findall(r"<svg[^>]*>", header):
+            if "use" in svg or 'width="0"' in svg:
+                continue
+            self.assertRegex(svg, r'width="\d+" height="\d+"')
 
 
 class RealSiteFeatureTests(unittest.TestCase):

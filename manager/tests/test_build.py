@@ -33,7 +33,7 @@ class BuildTests(TempDirCase):
         c = sample()
         c["github"]["title"] = "Different."
         result = builder.build(self.tmp, c)
-        self.assertEqual(sorted(result.changed), ["github.html", "search-index.js"])   # the search index follows the page text
+        self.assertEqual(sorted(result.changed), ["github.html", "search-index.js", "search.html"])   # the index follows the text; search.html links its new version
 
     def test_check_mode_writes_nothing(self):
         result = builder.build(self.tmp, sample(), check=True)

@@ -32,7 +32,7 @@ class ApplyEditTests(TempDirCase):
         result = service.apply_edit(self.site, lambda c: model.set_home(c, title="Changed"), rebuild=False)
         self.assertIsNone(result)
         self.assertEqual(cfg.load(self.site / "site.config.json")["home"]["title"], "Changed")
-        self.assertEqual(service.site_status(self.site)["stale"], ["index.html", "search-index.js"])
+        self.assertEqual(service.site_status(self.site)["stale"], ["index.html", "search.html", "search-index.js"])
 
     def test_status_of_an_invalid_config_does_not_raise(self):
         (self.site / "site.config.json").write_text("[]", encoding="utf-8")

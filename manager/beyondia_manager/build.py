@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List
@@ -59,6 +61,24 @@ def render_all(config: Dict[str, Any]) -> Dict[str, str]:
     return pages
 
 
+# Files every page loads by a fixed name. Each link gets ?v=<hash of the file>, so a browser that cached an
+# older version fetches the new one as soon as a page that needs it arrives: a new page is never shown with
+# an old stylesheet (which looks badly broken: wrong fonts, unstyled buttons, huge icons).
+VERSIONED_ASSETS = (("href", "beyondia.css"), ("src", "beyondia.js"), ("src", SEARCH_INDEX))
+
+
+def asset_version(content: bytes) -> str:
+    return hashlib.sha256(content).hexdigest()[:10]
+
+
+def stamp_assets(text: str, versions: Dict[str, str]) -> str:
+    """Add ?v=<version> to every link to a versioned asset (links that already carry one are re-stamped)."""
+    for attr, name in VERSIONED_ASSETS:
+        if name in versions:
+            text = re.sub(rf'{attr}="{re.escape(name)}(?:\?v=[0-9a-f]+)?"', f'{attr}="{name}?v={versions[name]}"', text)
+    return text
+
+
 def render_site(site_dir: Path, config: Dict[str, Any]) -> Dict[str, str]:
     """Everything the build writes: the generated pages, the hand-written pages with a fresh head, header
     and footer, and the files made from all of those (search index, sitemap, feed, robots.txt)."""
@@ -66,6 +86,12 @@ def render_site(site_dir: Path, config: Dict[str, Any]) -> Dict[str, str]:
     pages.update(sync_handwritten(site_dir, config, skip=pages))
     files = {SEARCH_INDEX: build_search_index(pages)}
     files.update(render_site_files(config, sorted(pages)))
+    versions = {SEARCH_INDEX: asset_version(files[SEARCH_INDEX].encode("utf-8"))}
+    for _attr, name in VERSIONED_ASSETS:
+        path = Path(site_dir) / name
+        if name not in versions and path.is_file():
+            versions[name] = asset_version(path.read_bytes())
+    pages = {name: stamp_assets(text, versions) for name, text in pages.items()}
     return {**pages, **files}
 
 
