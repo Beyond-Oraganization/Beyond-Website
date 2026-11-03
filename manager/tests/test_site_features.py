@@ -350,5 +350,49 @@ class RealSiteFeatureTests(unittest.TestCase):
         self.assertTrue((SITE_DIR / "treatise.pdf").read_bytes().startswith(b"%PDF"))
 
 
+class ApplicationFormTests(unittest.TestCase):
+    """The form on the community page, the page script and the mail sender (forms/application.gs) agree."""
+
+    FIELDS = ["name", "email", "phone", "message"]
+
+    @classmethod
+    def setUpClass(cls):
+        page = (SITE_DIR / "community.html").read_text(encoding="utf-8")
+        cls.form = re.search(r'<form id="apply-form"[^>]*>.*?</form>', page, re.S).group(0)
+        cls.script = (SITE_DIR / "beyondia.js").read_text(encoding="utf-8")
+        cls.sender = (SITE_DIR / "forms" / "application.gs").read_text(encoding="utf-8")
+
+    def list_in(self, text, name):
+        return json.loads(re.search(rf"var {name} = (\[[^\]]*\]);", text).group(1).replace("'", '"'))
+
+    def limits_in(self, text):
+        found = re.search(r"var LIMITS = \{([^}]*)\};", text).group(1)
+        return {key: int(value) for key, value in re.findall(r"(\w+): (\d+)", found)}
+
+    def test_it_posts_to_an_apps_script_web_app(self):
+        self.assertRegex(self.form, r'action="https://script\.google\.com/macros/s/[A-Za-z0-9_-]+/exec" method="post"')
+
+    def test_every_field_is_labelled_required_and_known_to_both_scripts(self):
+        self.assertEqual(self.list_in(self.script, "FIELDS"), self.FIELDS)
+        self.assertEqual(self.list_in(self.sender, "FIELDS"), self.FIELDS)
+        for name in self.FIELDS:
+            control = re.search(rf'<(?:input|textarea) id="apply-{name}" name="{name}"[^>]*>', self.form)
+            self.assertIsNotNone(control, name)
+            self.assertIn(" required", control.group(0), name)
+            self.assertIn(f'<label for="apply-{name}">', self.form, name)
+            self.assertIn(f"params.{name}", self.sender, name)
+
+    def test_the_length_limits_match(self):
+        limits = self.limits_in(self.sender)
+        self.assertEqual(self.limits_in(self.script), limits)
+        for name in self.FIELDS:
+            control = re.search(rf'id="apply-{name}"[^>]*>', self.form).group(0)
+            self.assertIn(f'maxlength="{limits[name]}"', control, name)
+
+    def test_the_bot_trap_is_hidden_and_checked(self):
+        self.assertRegex(self.form, r'(?s)<div class="hp" aria-hidden="true">.*?name="website"[^>]*tabindex="-1"')
+        self.assertIn("params.website", self.sender)
+
+
 if __name__ == "__main__":
     unittest.main()

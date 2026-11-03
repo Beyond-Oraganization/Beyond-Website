@@ -1,5 +1,6 @@
 /* Beyondia: the small amount of script the site uses. Everything works without it;
-   it adds the theme toggle, the mobile menu, a reading-progress fallback and the search. */
+   it adds the theme toggle, the mobile menu, a reading-progress fallback, the search
+   and the checks and sending of the application form. */
 (function () {
   "use strict";
   var root = document.documentElement;
@@ -54,6 +55,152 @@
     window.addEventListener("scroll", function () { if (!ticking) { ticking = true; window.requestAnimationFrame(update); } }, { passive: true });
     window.addEventListener("resize", update);
     update();
+  }
+
+  /* ---------- application form (community page) ----------
+     Without this the browser checks and posts the form itself; with it, mistakes are shown next to the
+     fields in plain words and the application is sent without leaving the page. The checks match the
+     mail sender's (forms/application.gs), which checks everything again. */
+  var applyForm = document.getElementById("apply-form");
+  if (applyForm && window.fetch && window.FormData && window.URLSearchParams) { setupApplication(applyForm); }
+
+  function setupApplication(form) {
+    var FIELDS = ["name", "email", "phone", "message"];
+    var LIMITS = { name: 100, email: 254, phone: 32, message: 3000 };
+    var status = document.getElementById("apply-status");
+    var done = document.getElementById("apply-done");
+    var submit = form.querySelector('button[type="submit"]');
+    var submitText = submit.textContent;
+    var hints = {};
+    var sending = false;
+    FIELDS.forEach(function (name) { hints[name] = form.elements[name].getAttribute("aria-describedby") || ""; });
+    form.setAttribute("novalidate", "");
+
+    function value(name) {
+      var raw = form.elements[name].value;
+      return name === "message" ? raw.trim() : raw.replace(/\s+/g, " ").trim();
+    }
+
+    function problem(name) {
+      var v = value(name);
+      if (name === "name") {
+        if (!v) { return "Enter your name."; }
+        if (v.length > LIMITS.name) { return "Use at most " + LIMITS.name + " characters."; }
+      } else if (name === "email") {
+        if (!v) { return "Enter your email address."; }
+        if (v.length > LIMITS.email || !/^[^\s@<>()[\]\\,;:"]+@[^\s@<>()[\]\\,;:".]+(\.[^\s@<>()[\]\\,;:".]+)+$/.test(v)) {
+          return "Enter an email address like name@example.com.";
+        }
+      } else if (name === "phone") {
+        if (!v) { return "Enter your phone number."; }
+        var digits = v.replace(/\D/g, "").length;
+        if (v.length > LIMITS.phone || !/^\+?[0-9()\-.\s]+$/.test(v) || digits < 7 || digits > 15) {
+          return "Enter a phone number with 7 to 15 digits, like +44 20 7946 0958.";
+        }
+      } else if (name === "message") {
+        if (!v) { return "Write a few words about yourself."; }
+        if (v.length > LIMITS.message) { return "Use at most " + LIMITS.message + " characters."; }
+      }
+      return "";
+    }
+
+    function mark(name, message) {
+      var input = form.elements[name];
+      var id = input.id + "-error";
+      var note = document.getElementById(id);
+      if (!message) {
+        if (note) { note.parentNode.removeChild(note); }
+        input.removeAttribute("aria-invalid");
+        if (hints[name]) { input.setAttribute("aria-describedby", hints[name]); } else { input.removeAttribute("aria-describedby"); }
+        return;
+      }
+      if (!note) {
+        note = document.createElement("p");
+        note.className = "field-error";
+        note.id = id;
+        input.parentNode.insertBefore(note, input.nextSibling);
+      }
+      note.textContent = message;
+      input.setAttribute("aria-invalid", "true");
+      input.setAttribute("aria-describedby", (id + " " + hints[name]).trim());
+    }
+
+    function say(text, isError) {
+      status.textContent = text;
+      status.classList.toggle("is-error", !!isError);
+    }
+
+    function markAll(errors) {
+      var first = null;
+      FIELDS.forEach(function (name) {
+        mark(name, errors[name] || "");
+        if (errors[name] && !first) { first = form.elements[name]; }
+      });
+      return first;
+    }
+
+    function setSending(on) {
+      sending = on;
+      submit.setAttribute("aria-disabled", on ? "true" : "false");
+      submit.textContent = on ? "Sending…" : submitText;
+      form.setAttribute("aria-busy", on ? "true" : "false");
+    }
+
+    function showDone() {
+      var first = value("name").split(" ")[0];
+      done.querySelector("[data-apply-name]").textContent = first ? ", " + first : "";
+      done.querySelector("[data-apply-email]").textContent = value("email");
+      form.hidden = true;
+      done.hidden = false;
+      document.getElementById("apply-done-title").focus();
+    }
+
+    FIELDS.forEach(function (name) {
+      var input = form.elements[name];
+      input.addEventListener("blur", function () { if (value(name)) { mark(name, problem(name)); } });
+      input.addEventListener("input", function () { if (input.getAttribute("aria-invalid") === "true") { mark(name, problem(name)); } });
+    });
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (sending) { return; }
+      var errors = {};
+      FIELDS.forEach(function (name) { var p = problem(name); if (p) { errors[name] = p; } });
+      var count = Object.keys(errors).length;
+      var first = markAll(errors);
+      if (first) {
+        say(count === 1 ? "Please correct the field marked above." : "Please correct the " + count + " fields marked above.", true);
+        first.focus();
+        return;
+      }
+      if (form.getAttribute("action").indexOf("YOUR-DEPLOYMENT-ID") !== -1) {
+        say("The application form is not connected yet. Meanwhile, find us on Telegram or Discord above.", true);
+        return;
+      }
+
+      var data = new URLSearchParams(new FormData(form));
+      data.set("reply", "json");
+      var controller = window.AbortController ? new AbortController() : null;
+      var timer = window.setTimeout(function () { if (controller) { controller.abort(); } }, 20000);
+      setSending(true);
+      say("Sending your application…", false);
+
+      fetch(form.action, { method: "POST", body: data, signal: controller ? controller.signal : undefined })
+        .then(function (response) {
+          if (!response.ok) { throw new Error("HTTP " + response.status); }
+          return response.json();
+        })
+        .then(function (result) {
+          if (result && result.ok) { say("", false); showDone(); return; }
+          var bad = result && result.errors ? markAll(result.errors) : null;
+          say((result && result.reason) || "The application could not be sent. Please try again.", true);
+          if (bad) { bad.focus(); }
+        })
+        .catch(function () {
+          say("The application could not be sent. Check your connection and try again, or write to us on Telegram.", true);
+        })
+        .then(function () { window.clearTimeout(timer); setSending(false); });
+    });
   }
 
   /* ---------- search ---------- */
