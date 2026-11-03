@@ -2,18 +2,18 @@
 *{box-sizing:border-box}
 a{color:inherit;text-decoration:none}
 a:hover{opacity:.7}
-a:focus-visible,button:focus-visible{outline:4px solid #8A8A84;outline-offset:2px}
-::selection{background:#1B1B1A;color:#D9D9D3}
+a:focus-visible,button:focus-visible{outline:4px solid #D62828;outline-offset:2px}
+::selection{background:#003049;color:#FCBF49}
 h1,h2,h3,p,ul,ol,li{margin:0;padding:0}
 ul,ol{list-style:none}
 
 /* ---------- page + sections (8px spacing scale) ---------- */
-.page{container-type:inline-size;background:#C8C8C2;color:#1B1B1A;font:400 18px/1.65 var(--f-r);overflow-x:clip}
+.page{container-type:inline-size;background:#FCBF49;color:#003049;font:400 18px/1.65 var(--f-r);overflow-x:clip}
 .sec{--sy:clamp(64px,7cqw,104px);--px:clamp(20px,5cqw,80px);--pl:clamp(56px,9cqw,136px);--rx:clamp(16px,3cqw,48px);
-  --bg:#C8C8C2;--fg:#1B1B1A;--mute:#4A4A47;--line:rgba(27,27,26,.35);--line2:#1B1B1A;
+  --bg:#FCBF49;--fg:#003049;--mute:#1F4A60;--line:rgba(0,48,73,.35);--line2:#003049;
   position:relative;overflow:hidden;background:var(--bg);color:var(--fg);padding:var(--sy) var(--px) var(--sy) var(--pl);border-top:4px solid var(--fg)}
-.sec.alt{--bg:#D3D3CD}
-.sec.dark{--bg:#262624;--fg:#D9D9D3;--mute:#A3A39D;--line:rgba(217,217,211,.35);--line2:#D9D9D3}
+.sec.alt{--bg:#FDC964}
+.sec.dark{--bg:#003049;--fg:#FCBF49;--mute:#F3C260;--line:rgba(252,191,73,.35);--line2:#FCBF49}
 .wrap{position:relative;max-width:1200px;margin:0 auto}
 .sec-head{margin-bottom:56px}
 
@@ -23,7 +23,7 @@ ul,ol{list-style:none}
 .rn{position:absolute;left:calc(var(--rx) - 11px);top:var(--sy);display:block;background:var(--bg);color:var(--fg)}
 
 /* ---------- type scale ---------- */
-.kicker{display:inline-block;margin-bottom:24px;padding:6px 12px;background:var(--fg);color:var(--bg);font:700 13px/1.3 var(--f-t);letter-spacing:.14em;text-transform:uppercase}
+.kicker{display:inline-block;margin-bottom:24px;padding:6px 12px;background:#D62828;color:#fff;font:700 13px/1.3 var(--f-t);letter-spacing:.14em;text-transform:uppercase}
 .h1{max-width:12em;text-wrap:balance;font:400 clamp(48px,8cqw,112px)/.95 var(--f-d);letter-spacing:-.02em;text-transform:uppercase}
 .h2{max-width:14em;text-wrap:balance;font:400 clamp(36px,5.2cqw,72px)/.98 var(--f-d);letter-spacing:-.02em;text-transform:uppercase}
 .h3{font:400 24px/1.15 var(--f-d);text-transform:uppercase;letter-spacing:-.01em}
@@ -113,10 +113,10 @@ ul,ol{list-style:none}
 .pill:hover{background:color-mix(in srgb,var(--fg) 10%,transparent)}
 
 /* ticker band */
-.ticker{overflow:hidden;background:#D9D9D3;color:#1B1B1A;border-top:4px solid #1B1B1A;border-bottom:4px solid #1B1B1A}
+.ticker{overflow:hidden;background:#F77F00;color:#003049;border-top:4px solid #003049;border-bottom:4px solid #003049}
 .ticker-track{display:flex;width:max-content}
 .ticker-group{display:flex;align-items:center;gap:32px;padding:20px 16px;font:400 clamp(22px,2.4cqw,32px)/1 var(--f-d);letter-spacing:-.01em;text-transform:uppercase;white-space:nowrap}
-.ticker-group i{display:block;width:14px;height:14px;background:#1B1B1A}
+.ticker-group i{display:block;width:14px;height:14px;background:#003049}
 
 @media (prefers-reduced-motion:no-preference){
   @keyframes rise{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
@@ -174,7 +174,7 @@ ul,ol{list-style:none}
     .rows>li::before,.pr::before,.contact li::before{animation:draw linear backwards;animation-timeline:view();animation-range:entry 0% entry 70%}
     .frame{animation:wipe linear backwards;animation-timeline:view();animation-range:entry 0% entry 80%}
     @keyframes progress{from{transform:scaleX(0)}to{transform:scaleX(1)}}
-    body::before{content:"";position:fixed;top:0;left:0;right:0;height:5px;background:#8A8A84;transform-origin:0 50%;transform:scaleX(0);animation:progress linear both;animation-timeline:scroll(root);z-index:100}
+    body::before{content:"";position:fixed;top:0;left:0;right:0;height:5px;background:#D62828;transform-origin:0 50%;transform:scaleX(0);animation:progress linear both;animation-timeline:scroll(root);z-index:100}
   }
 }
 
