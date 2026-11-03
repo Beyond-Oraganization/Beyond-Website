@@ -5,36 +5,55 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Beyondia — home</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<meta name="description" content="An idea that holds that people are made close by the ideas they live by.">
+<meta name="theme-color" content="#003049">
+<script>(function(d){d.className+=" js";try{if(localStorage.getItem("beyondia-theme")==="light")d.setAttribute("data-theme","light")}catch(e){}})(document.documentElement)</script>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="canonical" href="https://beyond-oraganization.github.io/Beyond-Website/">
+<meta property="og:site_name" content="Beyondia">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Beyondia — home">
+<meta property="og:description" content="An idea that holds that people are made close by the ideas they live by.">
+<meta property="og:url" content="https://beyond-oraganization.github.io/Beyond-Website/">
+<meta property="og:image" content="https://beyond-oraganization.github.io/Beyond-Website/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Beyondia: eight arrows converging on an eye">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="alternate" type="application/atom+xml" title="Beyondia — blog" href="feed.xml">
 <link rel="stylesheet" href="beyondia.css">
-<style>body{margin:0;background:#003049}</style>
+<script src="beyondia.js" defer></script>
 </head>
 <body>
 <div class="page">
 
+  <a class="skip" href="#main">Skip to content</a>
+  <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+    <symbol id="bm-logo" viewBox="36 36 328 328">
+      <g transform="translate(200 200)" fill="currentColor">
+        <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z"></path>
+        <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(45)"></path>
+        <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(90)"></path>
+        <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(135)"></path>
+        <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(180)"></path>
+        <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(225)"></path>
+        <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(270)"></path>
+        <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(315)"></path>
+      </g>
+      <g transform="translate(200 200) scale(1.25)" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round">
+        <path d="M-21 0Q0 -17 21 0Q0 17 -21 0Z"></path>
+        <circle r="7.5"></circle>
+        <circle r="3.2" fill="currentColor"></circle>
+      </g>
+    </symbol>
+  </svg>
   <header class="sec hdr">
   <div class="wrap" style="max-width: 1400px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 32px">
     <a href="index.html" class="brand" aria-label="Beyondia — home">
-      <svg viewBox="36 36 328 328" width="44" height="44" aria-hidden="true" style="display: block; flex: 0 0 44px">
-        <g transform="translate(200 200)" fill="#003049">
-          <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z"></path>
-          <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(45)"></path>
-          <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(90)"></path>
-          <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(135)"></path>
-          <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(180)"></path>
-          <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(225)"></path>
-          <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(270)"></path>
-          <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(315)"></path>
-        </g>
-        <g transform="translate(200 200) scale(1.25)" fill="none" stroke="#003049" stroke-width="3.5" stroke-linecap="round">
-          <path d="M-21 0Q0 -17 21 0Q0 17 -21 0Z"></path>
-          <circle r="7.5"></circle>
-          <circle r="3.2" fill="#003049"></circle>
-        </g>
-      </svg>
+      <svg width="44" height="44" aria-hidden="true" focusable="false" style="display: block; flex: 0 0 44px"><use href="#bm-logo"></use></svg>
       <span>BEYONDIA</span>
     </a>
-    <nav aria-label="Main navigation">
+    <nav id="main-nav" aria-label="Main navigation">
       <ul class="nav">
         <li><a href="stories.html" class="">STORIES</a></li>
         <li><a href="blog.html" class="">BLOG</a></li>
@@ -47,20 +66,27 @@
         <li><a href="creator.html" class="">CREATOR</a></li>
       </ul>
     </nav>
+    <div class="hdr-tools">
+      <a class="icon-btn" href="search.html" aria-label="Search the site"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5L21 21"></path></svg></a>
+      <button class="icon-btn theme-toggle" type="button" aria-pressed="false" aria-label="Light theme"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4.5"></circle><path d="M12 2.5V5M12 19V21.5M2.5 12H5M19 12H21.5M5.3 5.3L7 7M17 17L18.7 18.7M18.7 5.3L17 7M7 17L5.3 18.7"></path></svg><span class="icon-btn-label">Light</span></button>
+      <button class="icon-btn menu-btn" type="button" aria-expanded="false" aria-controls="main-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 6.5H20.5M3.5 12H20.5M3.5 17.5H20.5"></path></svg><span>Menu</span></button>
+    </div>
   </div>
 </header>
+
+  <main id="main" tabindex="-1">
 
   <!-- Hero -->
   <section class="sec dark" aria-labelledby="hero-title" style="padding: clamp(48px, 6cqw, 88px) var(--px) clamp(64px, 7cqw, 104px); text-align: center">
     <div style="position: relative; width: min(400px, 78%); aspect-ratio: 1; margin: 0 auto">
       <svg class="rings" viewBox="0 0 2400 2400" aria-hidden="true" style="position: absolute; left: 50%; top: 50%; width: 2400px; height: 2400px; max-width: none; margin: -1200px 0 0 -1200px; pointer-events: none; -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0, #000 340px, transparent 900px); mask-image: radial-gradient(circle at 50% 50%, #000 0, #000 340px, transparent 900px)">
-        <circle cx="1200" cy="1200" r="270" fill="none" stroke="rgba(252,191,73,0.3)" stroke-width="1"></circle>
-        <circle cx="1200" cy="1200" r="282" fill="none" stroke="rgba(252,191,73,0.35)" stroke-width="14" stroke-dasharray="1.2 23.2"></circle>
-        <circle cx="1200" cy="1200" r="390" fill="none" stroke="rgba(252,191,73,0.22)" stroke-width="1"></circle>
-        <circle cx="1200" cy="1200" r="530" fill="none" stroke="rgba(252,191,73,0.16)" stroke-width="1"></circle>
-        <circle cx="1200" cy="1200" r="690" fill="none" stroke="rgba(252,191,73,0.11)" stroke-width="1"></circle>
-        <circle cx="1200" cy="1200" r="870" fill="none" stroke="rgba(252,191,73,0.07)" stroke-width="1"></circle>
-        <g class="rays" transform="translate(1200 1200)" fill="none" stroke="rgba(252,191,73,0.3)" stroke-width="1" stroke-dasharray="1 9">
+        <circle cx="1200" cy="1200" r="270" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-width="1"></circle>
+        <circle cx="1200" cy="1200" r="282" fill="none" stroke="currentColor" stroke-opacity="0.35" stroke-width="14" stroke-dasharray="1.2 23.2"></circle>
+        <circle cx="1200" cy="1200" r="390" fill="none" stroke="currentColor" stroke-opacity="0.22" stroke-width="1"></circle>
+        <circle cx="1200" cy="1200" r="530" fill="none" stroke="currentColor" stroke-opacity="0.16" stroke-width="1"></circle>
+        <circle cx="1200" cy="1200" r="690" fill="none" stroke="currentColor" stroke-opacity="0.11" stroke-width="1"></circle>
+        <circle cx="1200" cy="1200" r="870" fill="none" stroke="currentColor" stroke-opacity="0.07" stroke-width="1"></circle>
+        <g class="rays" transform="translate(1200 1200)" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-width="1" stroke-dasharray="1 9">
           <path d="M0 -240V-1200"></path>
           <path d="M0 -240V-1200" transform="rotate(45)"></path>
           <path d="M0 -240V-1200" transform="rotate(90)"></path>
@@ -72,7 +98,7 @@
         </g>
       </svg>
       <svg class="mark" viewBox="36 36 328 328" role="img" aria-label="Symbol of Beyondia: eight arrows converging on an eye" style="position: relative">
-        <g class="arws" transform="translate(200 200)" fill="#FCBF49">
+        <g class="arws" transform="translate(200 200)" fill="currentColor">
           <g transform="rotate(0)"><path class="arw" d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z"></path></g>
           <g transform="rotate(45)"><path class="arw" d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z"></path></g>
           <g transform="rotate(90)"><path class="arw" d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z"></path></g>
@@ -82,11 +108,11 @@
           <g transform="rotate(270)"><path class="arw" d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z"></path></g>
           <g transform="rotate(315)"><path class="arw" d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z"></path></g>
         </g>
-        <g transform="translate(200 200) scale(1.25)" fill="none" stroke="#FCBF49" stroke-width="2.2" stroke-linecap="round"><g class="eye">
+        <g transform="translate(200 200) scale(1.25)" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><g class="eye">
           <path d="M-21 0Q0 -17 21 0Q0 17 -21 0Z"></path>
           <path d="M-24 -4Q0 -26 24 -4"></path>
           <circle r="7.5"></circle>
-          <circle class="pupil" r="3.2" fill="#FCBF49"></circle>
+          <circle class="pupil" r="3.2" fill="currentColor"></circle>
         </g></g>
       </svg>
     </div>
@@ -94,7 +120,7 @@
     <div class="hero-copy" style="position: relative; max-width: 880px; margin: 64px auto 0">
       <p class="kicker" style="justify-content: center">A country of ideas</p>
       <h1 id="hero-title" class="display">Beyondia</h1>
-      <p class="lead" style="max-width: 26em; margin: 32px auto 48px; color: #F6D58E">An idea that holds that people are made close by the ideas they live by.</p>
+      <p class="lead on-band" style="max-width: 26em; margin: 32px auto 48px">An idea that holds that people are made close by the ideas they live by.</p>
       <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 16px">
         <a href="ideology.html" class="btn btn-solid">Enter the ideology</a>
         <a href="community.html" class="btn btn-ghost">Meet the community</a>
@@ -183,27 +209,34 @@
     </div>
   </section>
 
+  <!-- Take part -->
+  <section class="sec alt" aria-labelledby="join-title">
+    <div class="rl" aria-hidden="true"></div><div class="rt" aria-hidden="true"></div>
+    <svg class="rn" viewBox="-12 -7 24 14" width="24" height="14" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M-11 0Q0 -9 11 0Q0 9 -11 0Z"></path><circle r="3.4"></circle><circle r="1.3" fill="currentColor"></circle></g></svg>
+
+    <div class="wrap">
+      <div class="sec-head" style="margin-bottom: 40px">
+        <p class="kicker">Take part</p>
+        <h2 id="join-title" class="h2">Follow Beyondia, or join in.</h2>
+        <p class="p mute" style="margin-top: 24px">New stories and posts appear here first. Read them as they come, write to the creator, or follow the work on GitHub.</p>
+      </div>
+
+      <div class="join">
+        <a href="community.html" class="btn btn-solid">Join the community</a>
+        <a href="https://github.com/Beyond-Oraganization" target="_blank" rel="noopener" class="btn btn-ghost">Follow on GitHub</a>
+        <a href="feed.xml" class="btn btn-ghost"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1.5" fill="currentColor"></circle></svg>&nbsp; Blog feed</a>
+        <a href="creator.html" class="btn btn-ghost">Write to the creator</a>
+      </div>
+    </div>
+  </section>
+
+  </main>
+
   <footer class="sec dark" style="padding-top: 0; padding-bottom: 40px">
   <div class="wrap" style="padding-top: 40px; border-top: 4px solid var(--line2)">
     <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px 48px">
       <a href="index.html" class="brand" aria-label="Beyondia — home">
-        <svg viewBox="36 36 328 328" width="48" height="48" aria-hidden="true" style="display: block; flex: 0 0 48px">
-          <g transform="translate(200 200)" fill="#FCBF49">
-            <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z"></path>
-            <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(45)"></path>
-            <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(90)"></path>
-            <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(135)"></path>
-            <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(180)"></path>
-            <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(225)"></path>
-            <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(270)"></path>
-            <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(315)"></path>
-          </g>
-          <g transform="translate(200 200) scale(1.25)" fill="none" stroke="#FCBF49" stroke-width="3.5" stroke-linecap="round">
-            <path d="M-21 0Q0 -17 21 0Q0 17 -21 0Z"></path>
-            <circle r="7.5"></circle>
-            <circle r="3.2" fill="#FCBF49"></circle>
-          </g>
-        </svg>
+        <svg width="48" height="48" aria-hidden="true" focusable="false" style="display: block; flex: 0 0 48px"><use href="#bm-logo"></use></svg>
         <span>BEYONDIA</span>
       </a>
       <nav aria-label="Footer navigation">
@@ -220,7 +253,12 @@
         </ul>
       </nav>
     </div>
-    <p class="label" style="margin-top: 32px; color: var(--mute)">© Beyondia · Created by Roman Patlai</p>
+    <ul class="foot-links">
+      <li><a href="search.html">Search</a></li>
+      <li><a href="feed.xml">Blog feed</a></li>
+      <li><a href="#main">Back to top</a></li>
+    </ul>
+    <p class="label" style="margin-top: 16px; color: var(--mute)">© Beyondia · Created by Roman Patlai</p>
   </div>
 </footer>
 

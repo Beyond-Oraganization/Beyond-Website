@@ -8,6 +8,9 @@ from .helpers import sample, tile
 
 HOSTILE = '<script>alert(1)</script> "quote" \'single\' & {{title}} {count}'
 
+# The page itself has two scripts (the theme snippet and beyondia.js); text from the config adds none.
+OWN_SCRIPTS = 2
+
 
 class Tags(HTMLParser):
     """Records tag names, so tests can assert that no foreign tag appeared."""
@@ -106,7 +109,7 @@ class HomeTests(unittest.TestCase):
         self.assertNotIn("<script>alert", html)
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", html)
         self.assertIn("{{title}}", html)                  # shown as text, not expanded
-        self.assertEqual(tags_of(html).tags.count("script"), 0)
+        self.assertEqual(tags_of(html).tags.count("script"), OWN_SCRIPTS)
 
     def test_deterministic(self):
         self.assertEqual(render.render_home(sample()), render.render_home(sample()))
@@ -141,7 +144,7 @@ class GithubTests(unittest.TestCase):
 
     def test_current_page_is_marked_in_navigation(self):
         html = render.render_github(sample())
-        self.assertIn('<a href="github.html" class="on">GITHUB</a>', html)
+        self.assertIn('<a href="github.html" class="on" aria-current="page">GITHUB</a>', html)
         self.assertEqual(html.count('class="on"'), 1)
 
     def test_hostile_text_is_inert(self):
@@ -151,7 +154,7 @@ class GithubTests(unittest.TestCase):
         r["stack"] = [HOSTILE]
         html = render.render_github(c)
         self.assertNotIn("<script>alert", html)
-        self.assertEqual(tags_of(html).tags.count("script"), 0)
+        self.assertEqual(tags_of(html).tags.count("script"), OWN_SCRIPTS)
 
     def test_quote_in_url_cannot_break_out_of_the_attribute(self):
         c = sample()

@@ -36,7 +36,7 @@ class HappyPathTests(PublisherCase):
         (self.work / "secret.env").write_text("TOKEN=abc\n")
         result = self.publish("update github page")
         self.assertEqual(result.status, "published")
-        self.assertEqual(sorted(result.files), ["github.html", "site.config.json"])
+        self.assertEqual(sorted(result.files), ["github.html", "search-index.js", "site.config.json"])
         self.assertEqual(self.remote_log()[0], "update github page")
         remote = self.clone_remote()
         self.assertIn("Changed.", (remote / "site.config.json").read_text())
@@ -81,7 +81,7 @@ class HappyPathTests(PublisherCase):
 class RetryTests(PublisherCase):
     def test_a_commit_left_unpushed_by_an_earlier_failure_is_pushed_next_time(self):
         self.change_title()
-        git(self.work, "add", "--", "site.config.json", "index.html", "github.html")
+        git(self.work, "add", "--", "site.config.json", "index.html", "github.html", "search-index.js")
         git(self.work, "commit", "-m", "committed by hand, never pushed")
         result = self.publish()
         self.assertEqual(result.status, "published")
@@ -96,7 +96,7 @@ class DryRunTests(PublisherCase):
         remote_head = git(self.remote, "rev-parse", "main")
         result = self.publish(dry_run=True)
         self.assertEqual(result.status, "dry-run")
-        self.assertEqual(sorted(result.files), ["github.html", "site.config.json"])
+        self.assertEqual(sorted(result.files), ["github.html", "search-index.js", "site.config.json"])
         self.assertTrue(any(c.startswith("git push origin main") for c in result.commands))
         self.assertEqual(git(self.work, "rev-parse", "HEAD"), head)
         self.assertEqual(git(self.work, "status", "--porcelain"), status)     # nothing staged either

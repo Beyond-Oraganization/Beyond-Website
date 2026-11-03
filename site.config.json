@@ -3,7 +3,8 @@
   "site": {
     "name": "Beyondia",
     "org_url": "https://github.com/Beyond-Oraganization",
-    "repo_url": "https://github.com/Beyond-Oraganization/Beyond-Website"
+    "repo_url": "https://github.com/Beyond-Oraganization/Beyond-Website",
+    "url": "https://beyond-oraganization.github.io/Beyond-Website/"
   },
   "home": {
     "kicker": "A country of ideas",

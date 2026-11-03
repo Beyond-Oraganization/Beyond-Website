@@ -11,6 +11,9 @@ from .test_render import tags_of
 
 HOSTILE = '<script>alert(1)</script> "quote" & {{title}}'
 
+# The page itself has two scripts (the theme snippet and beyondia.js); text from the config adds none.
+OWN_SCRIPTS = 2
+
 
 def lane_ids(c):
     return [lane["id"] for lane in c["plans"]["lanes"]]
@@ -213,7 +216,7 @@ class RenderTests(unittest.TestCase):
 
     def test_current_page_marked_in_navigation(self):
         html = render.render_plans(sample())
-        self.assertIn('<a href="plans.html" class="on">PLANS</a>', html)
+        self.assertIn('<a href="plans.html" class="on" aria-current="page">PLANS</a>', html)
         self.assertEqual(html.count('class="on"'), 1)
 
     def test_structure(self):
@@ -256,7 +259,7 @@ class RenderTests(unittest.TestCase):
         p["roadmap"]["steps"][0].update(when=HOSTILE, title=HOSTILE, text=HOSTILE, status=HOSTILE)
         html = render.render_plans(c)
         self.assertNotIn("<script>alert", html)
-        self.assertEqual(tags_of(html).tags.count("script"), 0)
+        self.assertEqual(tags_of(html).tags.count("script"), OWN_SCRIPTS)
         self.assertIn("{{title}}", html)
 
 

@@ -15,6 +15,9 @@ HOSTILE = '<script>alert(1)</script> "quote" & {{title}}'
 NEW = dict(id="lighthouse", title="The Lighthouse", summary="A keeper and a light.", aside="A light that stays.",
            body_text="A keeper lived alone.\n\nThe light never went out.")
 
+# The page itself has two scripts (the theme snippet and beyondia.js); text from the config adds none.
+OWN_SCRIPTS = 2
+
 
 def ids(c):
     return [s["id"] for s in c["stories"]["items"]]
@@ -146,7 +149,7 @@ class RenderTests(unittest.TestCase):
         html = render.render_stories(sample())
         for text in ("Stories title.", "Stories lead.", "The Angel", "An angel summary.", "#Tag", "Read the story", "Read the verses", "storyroman.html"):
             self.assertIn(text, html)
-        self.assertIn('<a href="stories.html" class="on">STORIES</a>', html)
+        self.assertIn('<a href="stories.html" class="on" aria-current="page">STORIES</a>', html)
         self.assertIsNone(re.search(r"\{\{\w+\}\}", html))
 
     def test_empty_list(self):
@@ -209,7 +212,7 @@ class RenderTests(unittest.TestCase):
                      {"type": "p", "text": HOSTILE}, {"type": "verse", "ref": "1:1", "paras": [HOSTILE, HOSTILE]}]
         for html in (render.render_stories(c), render.render_story(c, s)):
             self.assertNotIn("<script>alert", html)
-            self.assertEqual(tags_of(html).tags.count("script"), 0)
+            self.assertEqual(tags_of(html).tags.count("script"), OWN_SCRIPTS)
 
     def test_deterministic(self):
         self.assertEqual(render.render_story_pages(sample()), render.render_story_pages(sample()))

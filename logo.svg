@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="36 36 328 328" width="64" height="64" role="img" aria-label="Beyondia: eight arrows converging on an eye">
+  <rect x="36" y="36" width="328" height="328" rx="64" fill="#003049"/>
+  <g transform="translate(200 200) scale(.86)" fill="#FCBF49">
+    <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z"/>
+    <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(45)"/>
+    <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(90)"/>
+    <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(135)"/>
+    <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(180)"/>
+    <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(225)"/>
+    <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(270)"/>
+    <path d="M0 -38L16 -67L6 -63L0 -160L-6 -63L-16 -67Z" transform="rotate(315)"/>
+  </g>
+  <g transform="translate(200 200) scale(1.07)" fill="none" stroke="#FCBF49" stroke-width="3.6" stroke-linecap="round">
+    <path d="M-21 0Q0 -17 21 0Q0 17 -21 0Z"/>
+    <circle r="7.5"/>
+    <circle r="3.2" fill="#FCBF49"/>
+  </g>
+</svg>

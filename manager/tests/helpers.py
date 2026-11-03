@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 SITE_DIR = Path(__file__).resolve().parents[2]          # the real site folder
+COPIED_SUFFIXES = (".html", ".css", ".js", ".jpg", ".webp", ".png", ".svg", ".json", ".xml", ".txt", ".pdf")
 SAMPLE: Dict[str, Any] = {
     "schema": 1,
     "site": {
@@ -120,8 +121,9 @@ def copy_real_site(destination: Path) -> Path:
     """A private copy of the real pages, so tests can break things safely."""
     destination.mkdir(parents=True, exist_ok=True)
     for item in SITE_DIR.iterdir():
-        if item.is_file() and item.suffix in (".html", ".css", ".jpg", ".json"):
+        if item.is_file() and item.suffix in COPIED_SUFFIXES:
             shutil.copy2(item, destination / item.name)
+    shutil.copytree(SITE_DIR / "fonts", destination / "fonts", dirs_exist_ok=True)
     return destination
 
 
