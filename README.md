@@ -47,4 +47,6 @@ node manager/tools/axe_audit.js .   # accessibility audit (needs `npm i playwrig
 node manager/tools/make_pdf.js treatise.html treatise.pdf   # refresh the treatise PDF after editing it
 ```
 
+**After editing `beyondia.css` or `beyondia.js`, run `manager/bm build`.** Every page links them as `beyondia.css?v=<hash>`, so visitors never get a new page with an old cached stylesheet; the build updates that hash (CI fails if you forget).
+
 **Set the real address.** `site.url` in `site.config.json` (it ends with a slash) is what canonical links, the sharing image, the sitemap and the feed use. It is currently set to the likely GitHub Pages address, `https://beyond-oraganization.github.io/Beyond-Website/`; change it if the site lives elsewhere, then run `manager/bm build`. Leave it empty and those four things are simply left out.
