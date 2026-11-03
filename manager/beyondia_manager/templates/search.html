@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+{{head}}
+<body>
+<div class="page">
+
+  {{header}}
+
+  <main id="main" tabindex="-1">
+
+  <section class="sec" aria-labelledby="page-title">
+    <div class="rl" aria-hidden="true"></div><div class="rt" aria-hidden="true"></div>
+    <svg class="rn" viewBox="-12 -7 24 14" width="24" height="14" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M-11 0Q0 -9 11 0Q0 9 -11 0Z"></path><circle r="3.4"></circle><circle r="1.3" fill="currentColor"></circle></g></svg>
+
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <a href="index.html">Home</a><span class="sep">/</span><span class="here">Search</span>
+      </nav>
+
+      <div class="sec-head">
+        <p class="kicker">Search</p>
+        <h1 id="page-title" class="h1">Find a word in Beyondia.</h1>
+        <p class="lead" style="max-width: 24em; margin-top: 32px">Stories, blog posts, the treatise, the rules and every other page: type a word and the pages that contain it appear.</p>
+      </div>
+
+      <form id="search-form" class="search" role="search" action="search.html" method="get">
+        <label class="label" for="search-input" style="flex: 0 0 100%">Search the site</label>
+        <input id="search-input" name="q" type="search" autocomplete="off" placeholder="For example: elephant" spellcheck="false">
+        <button class="btn btn-solid" type="submit">Search</button>
+      </form>
+      <p id="search-status" class="search-status" role="status" aria-live="polite"></p>
+      <noscript><p class="p mute" style="margin-top: 24px">Search needs JavaScript. Without it, use the map on the <a href="index.html" style="text-decoration: underline">home page</a>.</p></noscript>
+      <ul id="search-results" class="results"></ul>
+    </div>
+  </section>
+
+  </main>
+
+  <script src="search-index.js"></script>
+
+  {{footer}}
+
+</div>
+</body>
+</html>

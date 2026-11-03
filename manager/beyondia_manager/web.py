@@ -12,8 +12,8 @@ try to send requests to ``localhost``):
   page, so it cannot learn the token. This defeats cross-site request forgery.
 * Only a fixed list of operations exists; each takes only named parameters of
   the expected type. There is no way to name a file or run a command.
-* The preview serves only ``*.html``, ``*.css`` and ``*.jpg`` files directly in
-  the site folder.
+* The preview serves only the site's own page, style, script, image, font and
+  document files, directly in the site folder or in its ``fonts`` folder.
 * The interface builds its DOM with ``textContent``, never ``innerHTML``, so
   config text cannot run as script in the interface either.
 """
@@ -39,8 +39,12 @@ from .errors import ConfigError, EditError, ManagerError
 UI_FILE = Path(__file__).resolve().parent / "ui" / "index.html"
 MAX_BODY = 1024 * 1024          # a long story is tens of kilobytes; this still stops absurd requests
 UNDO_DEPTH = 50
-PREVIEW_TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".jpg": "image/jpeg"}
-PREVIEW_NAME = re.compile(r"^[A-Za-z0-9_-]+\.(html|css|jpg)$")
+PREVIEW_TYPES = {
+    ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".jpg": "image/jpeg",
+    ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".webp": "image/webp",
+    ".woff2": "font/woff2", ".xml": "application/xml", ".pdf": "application/pdf",
+}
+PREVIEW_NAME = re.compile(r"^(?:fonts/)?[A-Za-z0-9_-]+\.(html|css|jpg|js|svg|png|webp|woff2|xml|pdf)$")
 
 CSP = (
     "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "

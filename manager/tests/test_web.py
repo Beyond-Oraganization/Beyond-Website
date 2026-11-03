@@ -448,13 +448,23 @@ class PreviewTests(ServerCase):
         self.assertEqual(self.client.request("GET", "/preview/beyondia.css")[0], 200)
         self.assertEqual(self.client.request("GET", "/preview/portrait.jpg")[1]["Content-Type"], "image/jpeg")
 
+    def test_serves_script_logo_and_fonts(self):
+        for name, kind in (("beyondia.js", "text/javascript"), ("logo.svg", "image/svg+xml"), ("og-image.png", "image/png"),
+                           ("portrait.webp", "image/webp"), ("fonts/archivo-black-400-latin.woff2", "font/woff2"),
+                           ("search-index.js", "text/javascript")):
+            with self.subTest(name=name):
+                status, hdrs, _ = self.client.request("GET", "/preview/" + name)
+                self.assertEqual(status, 200)
+                self.assertTrue(hdrs["Content-Type"].startswith(kind))
+
     def test_only_allow_listed_names_are_served(self):
         (self.site / ".bm.lock").write_text("x")
         (self.site / "secret.txt").write_text("x")
         (self.site / "sub").mkdir()
         (self.site / "sub" / "a.html").write_text("x")
         for name in ("site.config.json", ".bm.lock", "secret.txt", "sub/a.html", "..%2Fsite.config.json", "../site.config.json",
-                     "%2e%2e/site.config.json", "index.html/", "nope.html", ".git/config", "a.html%00.jpg"):
+                     "%2e%2e/site.config.json", "index.html/", "nope.html", ".git/config", "a.html%00.jpg",
+                     "fonts/../site.config.json", "fonts/x/y.woff2", "fonts/missing.woff2", "other/archivo.woff2"):
             with self.subTest(name=name):
                 self.assertEqual(self.client.request("GET", "/preview/" + name)[0], 404)
 
@@ -481,7 +491,7 @@ class PublishApiTests(GitCase):
         git_info = self.client.state()["status"]["git"]
         self.assertEqual(git_info["branch"], "main")
         self.assertTrue(git_info["origin"])
-        self.assertEqual(sorted(git_info["changed"]), ["index.html", "site.config.json"])
+        self.assertEqual(sorted(git_info["changed"]), ["index.html", "search-index.js", "site.config.json"])
 
     def test_dry_run_then_publish(self):
         self.client.edit("tile.visible", {"tile_id": "creator", "visible": False})

@@ -12,7 +12,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from . import config as cfg
 from . import publisher
-from .build import CONFIG_NAME, MANAGED_FILES, BuildResult, build, render_all
+from .build import CONFIG_NAME, MANAGED_FILES, BuildResult, build, render_all, synced_page_names
 from .checks import check_site
 from .errors import ConfigError, ManagerError
 from .locking import FileLock
@@ -76,6 +76,7 @@ def managed_files(site: Path, config: Config) -> List[str]:
     """Every file `publish` may commit: the fixed ones, the pages of the stories and posts in the config,
     and story/post pages Git tracks that the build has deleted (so a removal is published too)."""
     names = list(MANAGED_FILES) + [s["file"] for s in config["stories"]["items"]] + [p["file"] for p in config["blog"]["items"]]
+    names += synced_page_names(Path(site), config)
     git = Git(Path(site))
     if git.ok("rev-parse", "--is-inside-work-tree"):
         for name in publisher._lines(git.run("ls-files", "--", "story*.html", "blog-*.html").stdout):

@@ -1,0 +1,23 @@
+name: Accessibility audit
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  axe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install the audit tools
+        run: npm install --no-save playwright@1.63.0 axe-core@4.10.2
+      - name: Install a browser
+        run: npx playwright install --with-deps chromium
+      - name: axe-core over every page, both themes, desktop and phone
+        run: node manager/tools/axe_audit.js .

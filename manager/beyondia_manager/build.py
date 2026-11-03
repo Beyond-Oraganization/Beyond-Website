@@ -7,17 +7,28 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List
 
+from .chrome import sync_handwritten, synced_names
 from .config import ITEM_PAGE_RE, atomic_write_text
+from .extras import (
+    FEED, NOT_FOUND_PAGE, ROBOTS, SEARCH_INDEX, SEARCH_PAGE, SITEMAP, build_search_index, render_not_found,
+    render_search, render_site_files,
+)
 from .render import (
     GENERATED_MARK, render_blog, render_github, render_home, render_plans, render_post_pages, render_stories,
     render_story_pages,
 )
 
 CONFIG_NAME = "site.config.json"
-GENERATED_FILES = ("index.html", "github.html", "plans.html", "stories.html", "blog.html")
-# The files the manager always owns. Story and post pages come on top of these: see
-# service.managed_files(), because which of them exist depends on the config.
-MANAGED_FILES = (CONFIG_NAME,) + GENERATED_FILES
+GENERATED_FILES = ("index.html", "github.html", "plans.html", "stories.html", "blog.html", NOT_FOUND_PAGE, SEARCH_PAGE)
+# Files built from the pages themselves (or from the site address). The sitemap and the feed exist only
+# while the config has a site address; the others always.
+SITE_FILES = (ROBOTS, SITEMAP, FEED, SEARCH_INDEX)
+# The files the manager always owns. Story and post pages, and the hand-written pages whose header and
+# footer it keeps in step, come on top of these: see service.managed_files(), because which of them
+# exist depends on the config and on the folder.
+MANAGED_FILES = (CONFIG_NAME,) + GENERATED_FILES + SITE_FILES
+# Generated files that may be deleted when nothing wants them any more (the site address was removed).
+OPTIONAL_FILES = (SITEMAP, FEED)
 
 
 @dataclass
@@ -33,16 +44,40 @@ class BuildResult:
 
 
 def render_all(config: Dict[str, Any]) -> Dict[str, str]:
+    """Every generated page, from the config alone (no disk): enough to know a change can be rendered."""
     pages = {
         "index.html": render_home(config),
         "github.html": render_github(config),
         "plans.html": render_plans(config),
         "stories.html": render_stories(config),
         "blog.html": render_blog(config),
+        NOT_FOUND_PAGE: render_not_found(config),
+        SEARCH_PAGE: render_search(config),
     }
     pages.update(render_story_pages(config))
     pages.update(render_post_pages(config))
     return pages
+
+
+def render_site(site_dir: Path, config: Dict[str, Any]) -> Dict[str, str]:
+    """Everything the build writes: the generated pages, the hand-written pages with a fresh head, header
+    and footer, and the files made from all of those (search index, sitemap, feed, robots.txt)."""
+    pages = render_all(config)
+    pages.update(sync_handwritten(site_dir, config, skip=pages))
+    files = {SEARCH_INDEX: build_search_index(pages)}
+    files.update(render_site_files(config, sorted(pages)))
+    return {**pages, **files}
+
+
+def generated_page_names(config: Dict[str, Any]) -> List[str]:
+    """Names of the generated pages (cheap: no rendering)."""
+    return (list(GENERATED_FILES) + [s["file"] for s in config["stories"]["items"] if s.get("visible")]
+            + [p["file"] for p in config["blog"]["items"] if p.get("visible")])
+
+
+def synced_page_names(site_dir: Path, config: Dict[str, Any]) -> List[str]:
+    """Hand-written pages whose head, header and footer the build keeps in step."""
+    return synced_names(site_dir, config, {name: "" for name in generated_page_names(config)})
 
 
 def find_orphans(site_dir: Path, wanted: Dict[str, str]) -> List[str]:
@@ -54,8 +89,10 @@ def find_orphans(site_dir: Path, wanted: Dict[str, str]) -> List[str]:
     it can never be deleted, and neither can any other page of the site.
     """
     orphans = []
-    for path in sorted(Path(site_dir).glob("*.html")):
-        if path.name in wanted or not ITEM_PAGE_RE.match(path.name) or not path.is_file():
+    candidates = [p for p in sorted(Path(site_dir).glob("*.html")) if ITEM_PAGE_RE.match(p.name)]
+    candidates += [Path(site_dir) / name for name in OPTIONAL_FILES]
+    for path in candidates:
+        if path.name in wanted or not path.is_file():
             continue
         try:
             head = path.read_text(encoding="utf-8")[:2000]
@@ -74,7 +111,7 @@ def build(site_dir: Path, config: Dict[str, Any], check: bool = False) -> BuildR
     """
     site_dir = Path(site_dir)
     result = BuildResult()
-    pages = render_all(config)
+    pages = render_site(site_dir, config)
     for name, content in pages.items():
         target = site_dir / name
         if target.exists() and target.read_bytes() == content.encode("utf-8"):

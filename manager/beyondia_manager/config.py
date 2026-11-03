@@ -108,6 +108,28 @@ def url_problem(value: Any, allow_absolute: bool = True, allow_relative: bool = 
     return None
 
 
+def site_url_problem(value: Any) -> Optional[str]:
+    """The address the finished site is published at, or "" while it is not known.
+
+    It is optional: without it the site still builds, but the pieces that need
+    absolute addresses (canonical links, sharing image, sitemap, feed) are left out.
+    """
+    if value == "":
+        return None
+    if not isinstance(value, str):
+        return "must be text"
+    parts = urlsplit(value)
+    if parts.scheme not in ("http", "https") or not parts.netloc:
+        return "must be an absolute http(s):// address, or empty if the site has no address yet"
+    if "@" in parts.netloc:
+        return "must not contain credentials"
+    if parts.query or parts.fragment or any(ch.isspace() for ch in value):
+        return "must not contain a query, a fragment or spaces"
+    if not value.endswith("/"):
+        return "must end with a slash, as in https://example.com/ or https://name.github.io/repo/"
+    return None
+
+
 def _is_url(value: Any, path: str, problems: List[str], allow_absolute: bool = True, allow_relative: bool = True) -> None:
     why = url_problem(value, allow_absolute, allow_relative)
     if why:
@@ -178,6 +200,10 @@ def validate(data: Any) -> List[str]:
             _is_url(site["org_url"], "site.org_url", problems, allow_relative=False)
         if "repo_url" in site:
             _is_url(site["repo_url"], "site.repo_url", problems, allow_relative=False)
+        if "url" in site:
+            why = site_url_problem(site["url"])
+            if why:
+                problems.append(f"site.url: {why}")
 
     home = data.get("home")
     if home is not None and _is_dict(home, "home", problems):

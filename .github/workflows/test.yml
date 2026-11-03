@@ -23,5 +23,5 @@ jobs:
         run: sh manager/run_tests.sh
       - name: Generated pages match the config
         run: manager/bm build --check
-      - name: Links, anchors, navigation and fonts
+      - name: Links, navigation, metadata, images, fonts and colour contrast
         run: manager/bm check

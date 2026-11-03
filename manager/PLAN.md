@@ -255,10 +255,29 @@ A blog differs from stories in four ways that shape the design.
 
 **Drafts.** A draft has no page and is not listed; it comes back with its text when published. The real config starts with one draft post made of bracketed placeholder text (like the placeholders already on the site), so the editor has something to open and nothing unfinished is public.
 
-**Navigation.** `BLOG` is added to the navigation after `STORIES`. Generated pages take the navigation from one list in the code, but the ten hand-written pages (conclusions, ideology, community and so on) hold their own copy, so they were updated once by a script and the integrity check verifies all pages against the list. The cost is visible: adding another navigation item means touching those pages again. Turning them into generated pages would remove that cost and is the natural next step.
+**Navigation.** `BLOG` is added to the navigation after `STORIES`. Generated pages take the navigation from one list in the code, but the ten hand-written pages (conclusions, ideology, community and so on) hold their own copy, so they were updated once by a script and the integrity check verifies all pages against the list. The cost was visible: adding another navigation item meant touching those pages again. Section 15 removes it: `build` now keeps their head, header and footer in step with the templates.
 
 **Editor conveniences added at the same time.** The short name (id) of a new story or post is suggested from the title as you type, until you edit it yourself.
 
-**Not done.** No feed (RSS/Atom): it needs the absolute address of the published site, which the config does not know. No comments, no images inside posts, no pagination (a list of a few dozen posts is fine on one page).
+**Not done.** No comments, no images inside posts, no pagination (a list of a few dozen posts is fine on one page).
 
 **Tests for the blog.** The suite grew from 310 to about 360 tests. Ten more deliberate bugs were planted one at a time (links rendered without the safety rule, newest-first reversed, the date check, the post page family left out of deletion, post deletions left out of what `publish` commits, the page-name confinement, link validation, an unescaped title, repeated tags, chapters allowed in a post). The suite failed for every one. One test also freezes the clock and fails if the renderer ever reads today's date.
+
+## 15. Site-wide features (third round)
+
+Search, a light theme, self-hosted fonts, sharing tags, a feed and an accessibility audit were added. The parts that
+are easy to get wrong:
+
+| # | Decision | Rejected alternative | Why |
+|---|----------|----------------------|-----|
+| D15.1 | **The shared head, header and footer of hand-written pages are rewritten by `build`** (`chrome.py`), between markers it recognises by shape; the content between header and footer is never touched. | Converting the hand-written pages to config, or leaving 10 copies of the navigation to drift. | Section 1 listed editing these pages as a non-goal, and it still is: their *text* stays hand-written. Only the parts that were identical copies are now generated, which is what makes one navigation change a one-file change. A page of another shape is left alone and reported by `bm check`, so a surprising page can never be damaged. |
+| D15.2 | **The search index is a script** (`search-index.js` sets `window.BEYONDIA_INDEX`), not a JSON file read with `fetch`. | `fetch('index.json')`. | D1's reason again: a page opened from disk may load a neighbouring script but may not fetch a neighbouring file. |
+| D15.3 | **Absolute addresses come from one optional setting**, `site.url`. Without it canonical links, the sharing image, the sitemap and the feed are left out; the rest of the site builds as before. | Guessing the address from the repository, or writing relative URLs into a sitemap. | Both would publish wrong addresses. Sitemaps, feeds and sharing images are required to be absolute. |
+| D15.4 | **Two themes are colour tokens** (`:root` and `:root[data-theme="light"]`), chosen by a tiny inline script before the first paint. | Two stylesheets, or a media query on the visitor's system setting. | One stylesheet keeps the themes from drifting; the inline script avoids a flash of the wrong theme; the classic theme stays the default so existing visitors see no change. |
+| D15.5 | **Colour contrast is a check** (`checks.check_contrast`): every text/background token pair of both themes is computed against WCAG AA when `bm check` runs and in the tests. | Checking by eye. | A palette change that makes text unreadable now fails the build instead of reaching the site. |
+| D15.6 | **Duplicate titles and descriptions fail `bm check` (and CI) but not `publish`.** | Failing both. | Copying a page is legitimate; it should be noticed in CI, not stop an author from publishing. |
+| D15.7 | **No font `preload` hints.** | Preloading the two main fonts. | `preload` with `crossorigin` is blocked for pages opened from disk and fills the console with errors; `font-display: swap` already keeps text readable while fonts load. |
+
+Tests added: `test_site_features.py` (head and sharing tags, 404/search pages, sitemap, feed, robots, search index,
+shared-chrome sync, site address validation), and new cases in `test_checks.py` (metadata, skip link, `<main>`,
+images, fonts, contrast, sitemap).

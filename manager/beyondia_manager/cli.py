@@ -427,7 +427,7 @@ def _all_plan_items(config: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def _cmd_check(site: Path, con: Console) -> int:
-    problems = check_site(site)
+    problems = check_site(site, strict=True)
     if problems:
         con.warn(f"{len(problems)} problem(s) found:")
         for problem in problems:

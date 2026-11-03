@@ -5,7 +5,10 @@ from beyondia_manager import build as builder
 from .helpers import TempDirCase, sample
 
 
-ALL_PAGES = ["blog-hello.html", "blog-second.html", "blog.html", "github.html", "index.html", "plans.html", "stories.html", "storyangel.html", "storyroman.html"]
+PAGES = ["404.html", "blog-hello.html", "blog-second.html", "blog.html", "github.html", "index.html", "plans.html", "search.html", "stories.html", "storyangel.html", "storyroman.html"]
+# Files made from the pages themselves. The sample config has no site address, so there is no sitemap or feed.
+SITE_FILES = ["robots.txt", "search-index.js"]
+ALL_PAGES = sorted(PAGES + SITE_FILES)
 
 
 class BuildTests(TempDirCase):
@@ -30,7 +33,7 @@ class BuildTests(TempDirCase):
         c = sample()
         c["github"]["title"] = "Different."
         result = builder.build(self.tmp, c)
-        self.assertEqual(result.changed, ["github.html"])
+        self.assertEqual(sorted(result.changed), ["github.html", "search-index.js"])   # the search index follows the page text
 
     def test_check_mode_writes_nothing(self):
         result = builder.build(self.tmp, sample(), check=True)
@@ -54,7 +57,10 @@ class BuildTests(TempDirCase):
         self.assertEqual(sorted(p.name for p in self.tmp.iterdir()), ALL_PAGES)
 
     def test_managed_files_are_exactly_config_and_generated(self):
-        self.assertEqual(set(builder.MANAGED_FILES), {"site.config.json", "index.html", "github.html", "plans.html", "stories.html", "blog.html"})
+        self.assertEqual(set(builder.MANAGED_FILES), {
+            "site.config.json", "index.html", "github.html", "plans.html", "stories.html", "blog.html", "404.html", "search.html",
+            "robots.txt", "sitemap.xml", "feed.xml", "search-index.js",
+        })
 
 
 if __name__ == "__main__":

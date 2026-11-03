@@ -97,13 +97,27 @@ A change that would make the config invalid is **refused and nothing is written*
 The map title may contain `{count}`, which becomes the number of visible doors in words
 ("Eight doors into Beyondia.").
 
-Other commands: `validate`, `check` (links, anchors, navigation, fonts of all pages),
-`build` / `build --check`, `status`.
+Other commands: `validate`, `check` (links, anchors, navigation, metadata, images, self-hosted fonts, colour
+contrast, and that no two pages share a title or description), `build` / `build --check`, `status`.
+
+## What `build` writes besides the five pages
+
+* **404.html** and **search.html**, generated like the other pages.
+* **The hand-written pages** (`ideology.html`, `treatise.html`, `community.html` ...): `build` rewrites only their
+  `<head>`, header and footer from the templates and leaves everything between the header and the footer alone.
+  So a change to the navigation, the icons or the scripts is made once, in `manager/beyondia_manager/templates/`.
+  Their description (the `<meta name="description">`) is theirs: if a page has none, it is taken from the first `lead`
+  paragraph the first time, and then kept. A page that does not have the expected shape (header, footer, nothing
+  after the footer) is not touched and not published; `bm check` says what it lacks.
+* **search-index.js**: title, headings and text of every page, for the search page.
+* **robots.txt**, and, when `site.url` is set in `site.config.json`, **sitemap.xml** and **feed.xml** (Atom, newest
+  post first). `site.url` also turns on canonical links and the sharing image in every page head.
 
 ## Publishing
 
 `manager/bm publish -m "message"` validates, builds, checks the whole site, commits **only**
-`site.config.json`, `index.html`, `plans.html`, `stories.html`, `blog.html`, `github.html`, the story and post pages (including the deletion of a removed page), runs `git pull --rebase`, and pushes.
+`site.config.json`, `index.html`, `plans.html`, `stories.html`, `blog.html`, `github.html`, `404.html`, `search.html`, `search-index.js`, `robots.txt`, `sitemap.xml`, `feed.xml`, the story and post pages (including the deletion of a removed page) and the hand-written pages whose header and footer the build keeps in step, runs `git pull --rebase`, and pushes.
+Files such as `beyondia.css`, `beyondia.js`, the fonts and the images are not managed: commit them yourself.
 It never uses `--force`. Your other uncommitted files are not touched or published.
 If GitHub has a conflicting change, nothing is pushed and the message tells you what to do.
 
@@ -121,9 +135,11 @@ git fetch origin && git reset origin/main      # keeps your files, only adopts t
 sh manager/run_tests.sh
 ```
 
-Runs about 360 tests in a few seconds, with no network. GitHub Actions runs them on every push
+Runs about 420 tests in about a minute, with no network. GitHub Actions runs them on every push
 (`.github/workflows/test.yml`), together with `bm build --check` and `bm check`, so a green check
-on GitHub means the pages match the config and no link is broken.
+on GitHub means the pages match the config, no link is broken, every page has its metadata and the colours
+are readable. A second workflow (`.github/workflows/audit.yml`) runs `manager/tools/axe_audit.js`: axe-core over
+every page, in both themes, at desktop and phone width.
 
 ## Manual smoke check (what automatic tests cannot see)
 
@@ -131,7 +147,8 @@ After a real publish, once:
 
 1. Open the site and confirm the home page looks right and every door opens.
 2. Open the GitHub page: each repository link goes to the right repository.
-3. Resize the window to phone width: nothing overflows.
+3. Resize the window to phone width: nothing overflows and the Menu button opens the navigation.
+   Press the sun button: the light theme appears and is still there on the next page.
 4. Hide a door, publish, and confirm it is gone and the count in the title changed.
 5. Unhide it and publish again.
 

@@ -14,6 +14,9 @@ from .test_render import tags_of
 HOSTILE = '<script>alert(1)</script> "quote" & {{title}}'
 NEW = dict(id="third", title="A third post", date="2026-10-10", summary="Third summary.", body_text="Third body.\n\nMore.", tags=["Ideas"])
 
+# The page itself has two scripts (the theme snippet and beyondia.js); text from the config adds none.
+OWN_SCRIPTS = 2
+
 
 def ids(c):
     return [p["id"] for p in c["blog"]["items"]]
@@ -178,7 +181,7 @@ class RenderTests(unittest.TestCase):
         for text in ("Blog title.", "Blog lead.", "A hello summary.", "1 October 2026", "20 October 2026", "News", "Ideas", "Read the post", "blog-hello.html", "1 min read"):
             self.assertIn(text, html)
         self.assertLess(html.index("Second"), html.index("Hello"))                    # newest first
-        self.assertIn('<a href="blog.html" class="on">BLOG</a>', html)
+        self.assertIn('<a href="blog.html" class="on" aria-current="page">BLOG</a>', html)
         self.assertIsNone(re.search(r"\{\{\w+\}\}", html))
 
     def test_equal_dates_keep_the_order_of_the_config(self):
@@ -227,7 +230,7 @@ class RenderTests(unittest.TestCase):
         p["body"] = [{"type": "heading", "text": HOSTILE}, {"type": "note", "text": HOSTILE}, {"type": "p", "text": HOSTILE}]
         for html in (render.render_blog(c), render.render_post(c, p)):
             self.assertNotIn("<script>alert", html)
-            self.assertEqual(tags_of(html).tags.count("script"), 0)
+            self.assertEqual(tags_of(html).tags.count("script"), OWN_SCRIPTS)
 
     def test_deterministic(self):
         self.assertEqual(render.render_post_pages(sample()), render.render_post_pages(sample()))
@@ -236,7 +239,7 @@ class RenderTests(unittest.TestCase):
     def test_navigation_has_the_blog_item_after_stories(self):
         keys = [key for key, _label, _href in render.NAV]
         self.assertEqual(keys[keys.index("stories") + 1], "blog")
-        self.assertIn('<li><a href="blog.html">BLOG</a></li>', render.render_footer())
+        self.assertIn('<li><a href="blog.html">BLOG</a></li>', render.render_footer(sample()))
 
 
 class PostPagesLeaveTests(TempDirCase):
