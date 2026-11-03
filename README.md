@@ -54,4 +54,4 @@ node manager/tools/make_pdf.js treatise.html treatise.pdf   # refresh the treati
 
 ## The application form
 
-The **Apply** section of `community.html` sends each application (name, email, phone, message) to your inbox as a styled email. GitHub Pages cannot send mail, so a small Google Apps Script web app, `forms/application.gs`, does it from your Google account: free, no API keys, nothing stored. **It needs connecting once** (about three minutes): follow [forms/README.md](forms/README.md), then put the web app address in the form's `action` in `community.html`. Until then the form tells visitors it is not connected yet.
+The **Apply** section of `community.html` sends each application (name, email, phone, message) to beyondia.official@gmail.com as a styled email. GitHub Pages cannot send mail, so a small Google Apps Script web app, `forms/application.gs`, does it from your Google account: free, no API keys, nothing stored. **It needs connecting once** (about three minutes): follow [forms/README.md](forms/README.md), then put the web app address in the form's `action` in `community.html`. Until then the form tells visitors it is not connected yet.

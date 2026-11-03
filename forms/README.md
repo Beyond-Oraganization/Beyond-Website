@@ -1,29 +1,30 @@
 # The application form
 
 The **Apply** section of `community.html` asks for a name, email, phone and message, and emails each
-application, styled in the site's colours, to your inbox. The site is static (GitHub Pages cannot send mail),
-so the sending is done by `application.gs`: a small Google Apps Script web app that runs on your Google
-account. It is free, needs no API keys, and stores nothing: the email is the only record.
+application, styled in the site's colours, to **beyondia.official@gmail.com**. The site is static (GitHub
+Pages cannot send mail), so the sending is done by `application.gs`: a small Google Apps Script web app that
+runs on a Google account. It is free, needs no API keys, and stores nothing: the email is the only record.
 
 ```
-visitor fills the form ──► community.html ──POST──► Apps Script web app ──► styled email in your inbox
+visitor fills the form ──► community.html ──POST──► Apps Script web app ──► styled email to Beyondia
                            (checks the fields)       (checks them again,      (Reply answers the
                                                       blocks bots and floods)  applicant directly)
 ```
 
 ## Connect it (once, about three minutes)
 
-1. Open <https://script.google.com>, signed in with the Google account that should **receive** the
-   applications, and press **New project**. Name it, for example, *Beyondia applications*.
+1. Open <https://script.google.com>, signed in as **beyondia.official@gmail.com**, and press **New project**.
+   Name it, for example, *Beyondia applications*. (Any Google account works, since the applications always
+   go to beyondia.official@gmail.com, but the emails are sent *from* the account that runs the script.)
 2. Delete the sample code in `Code.gs`, paste the whole of [`application.gs`](application.gs) in its place,
    and save.
 3. **Deploy → New deployment**. Next to *Select type* press the gear and choose **Web app**. Set
    * *Execute as*: **Me**
    * *Who has access*: **Anyone**
 
-   and press **Deploy**. Google asks you to authorise it: it needs to *send email as you* and to *see your
-   email address* (that is where the applications go). Because the script is your own and not published,
-   Google shows "Google hasn't verified this app": choose **Advanced → Go to Beyondia applications**.
+   and press **Deploy**. Google asks you to authorise it: it needs to *send email as you*. Because the
+   script is your own and not published, Google shows "Google hasn't verified this app": choose
+   **Advanced → Go to Beyondia applications**.
 4. Copy the **Web app URL** (`https://script.google.com/macros/s/…/exec`). Open it in a browser: it should
    say *The Beyondia application form is connected*.
 5. In `community.html`, replace `https://script.google.com/macros/s/YOUR-DEPLOYMENT-ID/exec` in the
@@ -38,7 +39,7 @@ In the Apps Script project, **Project Settings**:
 
 | Setting | What it does |
 |---|---|
-| Script property `RECIPIENT` | Send applications to another address (by default: the account that deployed the script) |
+| Script property `RECIPIENT` | Send applications to another address instead of beyondia.official@gmail.com (`DEFAULT_RECIPIENT` at the top of `application.gs`) |
 | Script property `SITE_URL` | The link back shown to visitors without JavaScript (default: the community page on GitHub Pages) |
 | Time zone | The time zone of "Applied …" in the email |
 

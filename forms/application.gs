@@ -2,8 +2,8 @@
  * Beyondia: the application form's mail sender.
  *
  * The site is static, so the form on community.html posts here: a Google Apps Script web app that checks the
- * application and emails it, styled in the site's colours, to the Google account that deploys it. Setup (about
- * three minutes) is in forms/README.md. Nothing is stored: the email is the only record.
+ * application and emails it, styled in the site's colours, to beyondia.official@gmail.com. Setup (about three
+ * minutes) is in forms/README.md. Nothing is stored: the email is the only record.
  *
  * The form sends four fields (name, email, phone, message), a hidden trap field (website) that people never
  * see and bots fill in, and reply=json when the page's script sends it (without script the browser posts the
@@ -11,8 +11,9 @@
  */
 
 // ---------- settings (Project Settings → Script properties overrides the first two) ----------
-// RECIPIENT: where applications go. Empty means the Google account that deployed the script.
+// RECIPIENT: where applications go, instead of DEFAULT_RECIPIENT.
 // SITE_URL: the community page, for the link back after a submission made without script.
+var DEFAULT_RECIPIENT = 'beyondia.official@gmail.com';
 var DEFAULT_SITE_URL = 'https://beyond-oraganization.github.io/Beyond-Website/community.html';
 var MAX_PER_HOUR = 30;              // more than this in one hour is refused (a flood, not a community)
 var REPEAT_WINDOW_SECONDS = 600;    // the same application sent twice in ten minutes is mailed once
@@ -286,7 +287,7 @@ function textReply(result, params) {
 
 function recipient() {
   var configured = PropertiesService.getScriptProperties().getProperty('RECIPIENT');
-  return (configured && configured.trim()) || Session.getEffectiveUser().getEmail();
+  return (configured && configured.trim()) || DEFAULT_RECIPIENT;
 }
 
 function siteUrl() {
