@@ -35,7 +35,6 @@ All colours are tokens at the top of `beyondia.css` (`:root` for classic, `:root
 - `beyondia.js` — theme toggle, mobile menu, reading-progress fallback, search and the application form's checks; every page works without it
 - `search-index.js` — the search index, generated from the text of all pages
 - `logo.svg` (icon), `og-image.png` (link preview), `portrait.jpg` / `portrait.webp`
-- `forms/application.gs` — the mail sender behind the application form (a Google Apps Script web app)
 - `sitemap.xml`, `feed.xml` (Atom feed of the blog), `robots.txt` — generated; they need `site.url` in `site.config.json`
 
 ## Working on it
@@ -54,4 +53,9 @@ node manager/tools/make_pdf.js treatise.html treatise.pdf   # refresh the treati
 
 ## The application form
 
-The **Apply** section of `community.html` sends each application (name, email, phone, message) to your inbox as a styled email. GitHub Pages cannot send mail, so a small Google Apps Script web app, `forms/application.gs`, does it from your Google account: free, no API keys, nothing stored. **It needs connecting once** (about three minutes): follow [forms/README.md](forms/README.md), then put the web app address in the form's `action` in `community.html`. Until then the form tells visitors it is not connected yet.
+The **Apply** section of `community.html` asks for a name, email, phone and message. The site has no server and uses no outside service, so an application travels as an email from the visitor's own email app (the `mailto:` protocol): **Send by email** opens a new message to beyondia.official@gmail.com with the subject *New member application: <name>* and the details laid out in plain text, and the visitor presses Send. Pressing Reply answers them directly.
+
+- The email is plain text (a `mailto:` link cannot carry formatting), and it arrives only once the visitor sends it.
+- If no email app opens (someone who only uses webmail in the browser), the page offers the application to copy and paste into an email.
+- Without JavaScript the form is replaced by a link that opens an email to beyondia.official@gmail.com with the four headings to fill in. (Browsers' own handling of a `mailto:` form garbles `+`, `&` and non-Latin letters, so the form always builds the email with the script.)
+- To send applications elsewhere, replace beyondia.official@gmail.com everywhere in `community.html` (the form's `action`, which the script reads, and the texts and links around it). The tests check that they all agree.

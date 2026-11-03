@@ -1,6 +1,6 @@
 /* Beyondia: the small amount of script the site uses. Everything works without it;
    it adds the theme toggle, the mobile menu, a reading-progress fallback, the search
-   and the checks and sending of the application form. */
+   and the checks and email layout of the application form. */
 (function () {
   "use strict";
   var root = document.documentElement;
@@ -58,27 +58,30 @@
   }
 
   /* ---------- application form (community page) ----------
-     Without this the browser checks and posts the form itself; with it, mistakes are shown next to the
-     fields in plain words and the application is sent without leaving the page. The checks match the
-     mail sender's (forms/application.gs), which checks everything again. */
+     The site has no server, so an application travels as an email from the visitor's own email app
+     (mailto:). Without this script the browser checks the fields and hands them to the email app as
+     plain lines; with it, mistakes are shown next to the fields in plain words, the email is laid out
+     neatly, and the application can be copied when no email app opens. The address is read from the
+     form's action, so it is written in one place only. */
   var applyForm = document.getElementById("apply-form");
-  if (applyForm && window.fetch && window.FormData && window.URLSearchParams) { setupApplication(applyForm); }
+  if (applyForm) { setupApplication(applyForm); }
 
   function setupApplication(form) {
     var FIELDS = ["name", "email", "phone", "message"];
-    var LIMITS = { name: 100, email: 254, phone: 32, message: 3000 };
+    var LIMITS = { name: 100, email: 254, phone: 32, message: 2000 };
+    var RULE = "========================";
+    var address = form.getAttribute("action").replace(/^mailto:/, "").split("?")[0];
     var status = document.getElementById("apply-status");
-    var done = document.getElementById("apply-done");
-    var submit = form.querySelector('button[type="submit"]');
-    var submitText = submit.textContent;
+    var next = document.getElementById("apply-next");
+    var copyText = document.getElementById("apply-copy-text");
+    var copyStatus = document.getElementById("apply-copy-status");
     var hints = {};
-    var sending = false;
     FIELDS.forEach(function (name) { hints[name] = form.elements[name].getAttribute("aria-describedby") || ""; });
     form.setAttribute("novalidate", "");
 
     function value(name) {
       var raw = form.elements[name].value;
-      return name === "message" ? raw.trim() : raw.replace(/\s+/g, " ").trim();
+      return name === "message" ? raw.replace(/\r\n?/g, "\n").trim() : raw.replace(/\s+/g, " ").trim();
     }
 
     function problem(name) {
@@ -125,34 +128,29 @@
       input.setAttribute("aria-describedby", (id + " " + hints[name]).trim());
     }
 
-    function say(text, isError) {
-      status.textContent = text;
-      status.classList.toggle("is-error", !!isError);
+    function say(node, text, isError) {
+      node.textContent = text;
+      node.classList.toggle("is-error", !!isError);
     }
 
-    function markAll(errors) {
-      var first = null;
-      FIELDS.forEach(function (name) {
-        mark(name, errors[name] || "");
-        if (errors[name] && !first) { first = form.elements[name]; }
-      });
-      return first;
-    }
-
-    function setSending(on) {
-      sending = on;
-      submit.setAttribute("aria-disabled", on ? "true" : "false");
-      submit.textContent = on ? "Sending…" : submitText;
-      form.setAttribute("aria-busy", on ? "true" : "false");
-    }
-
-    function showDone() {
-      var first = value("name").split(" ")[0];
-      done.querySelector("[data-apply-name]").textContent = first ? ", " + first : "";
-      done.querySelector("[data-apply-email]").textContent = value("email");
-      form.hidden = true;
-      done.hidden = false;
-      document.getElementById("apply-done-title").focus();
+    /* The email itself: plain text (mailto: carries no formatting), laid out to read well in any inbox. */
+    function letter() {
+      return [
+        "NEW MEMBER APPLICATION",
+        "Beyondia, a country of ideas",
+        RULE,
+        "",
+        "Name:   " + value("name"),
+        "Email:  " + value("email"),
+        "Phone:  " + value("phone"),
+        "",
+        "Message",
+        "-------",
+        value("message"),
+        "",
+        RULE,
+        "Sent from the application form on the Beyondia website."
+      ].join("\n");
     }
 
     FIELDS.forEach(function (name) {
@@ -163,43 +161,44 @@
 
     form.addEventListener("submit", function (event) {
       event.preventDefault();
-      if (sending) { return; }
-      var errors = {};
-      FIELDS.forEach(function (name) { var p = problem(name); if (p) { errors[name] = p; } });
-      var count = Object.keys(errors).length;
-      var first = markAll(errors);
+      var first = null;
+      var count = 0;
+      FIELDS.forEach(function (name) {
+        var p = problem(name);
+        mark(name, p);
+        if (p) { count++; if (!first) { first = form.elements[name]; } }
+      });
       if (first) {
-        say(count === 1 ? "Please correct the field marked above." : "Please correct the " + count + " fields marked above.", true);
+        say(status, count === 1 ? "Please correct the field marked above." : "Please correct the " + count + " fields marked above.", true);
         first.focus();
         return;
       }
-      if (form.getAttribute("action").indexOf("YOUR-DEPLOYMENT-ID") !== -1) {
-        say("The application form is not connected yet. Meanwhile, find us on Telegram or Discord above.", true);
-        return;
+      say(status, "", false);
+      say(copyStatus, "", false);
+      var body = letter();
+      copyText.value = "To: " + address + "\n\n" + body;
+      next.hidden = false;
+      document.getElementById("apply-next-title").focus();
+      window.location.href = "mailto:" + address +
+        "?subject=" + encodeURIComponent("New member application: " + value("name")) +
+        "&body=" + encodeURIComponent(body.replace(/\n/g, "\r\n"));
+    });
+
+    document.getElementById("apply-copy").addEventListener("click", function () {
+      function selectAndAsk() {
+        copyText.focus();
+        copyText.select();
+        var copied = false;
+        try { copied = document.execCommand("copy"); } catch (e) { copied = false; }
+        say(copyStatus, copied ? "Copied. Paste it into a new email to " + address + "." : "Copying is not allowed here: the text is selected, copy it yourself.", !copied);
       }
-
-      var data = new URLSearchParams(new FormData(form));
-      data.set("reply", "json");
-      var controller = window.AbortController ? new AbortController() : null;
-      var timer = window.setTimeout(function () { if (controller) { controller.abort(); } }, 20000);
-      setSending(true);
-      say("Sending your application…", false);
-
-      fetch(form.action, { method: "POST", body: data, signal: controller ? controller.signal : undefined })
-        .then(function (response) {
-          if (!response.ok) { throw new Error("HTTP " + response.status); }
-          return response.json();
-        })
-        .then(function (result) {
-          if (result && result.ok) { say("", false); showDone(); return; }
-          var bad = result && result.errors ? markAll(result.errors) : null;
-          say((result && result.reason) || "The application could not be sent. Please try again.", true);
-          if (bad) { bad.focus(); }
-        })
-        .catch(function () {
-          say("The application could not be sent. Check your connection and try again, or write to us on Telegram.", true);
-        })
-        .then(function () { window.clearTimeout(timer); setSending(false); });
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(copyText.value).then(function () {
+          say(copyStatus, "Copied. Paste it into a new email to " + address + ".", false);
+        }, selectAndAsk);
+      } else {
+        selectAndAsk();
+      }
     });
   }
 

@@ -22,8 +22,8 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="alternate" type="application/atom+xml" title="Beyondia — blog" href="feed.xml">
 <style>body{margin:0;background:#003049}.skip{position:absolute;left:-999em}</style>
-<link rel="stylesheet" href="beyondia.css?v=1841e98cd2">
-<script src="beyondia.js?v=551b14e3a7" defer></script>
+<link rel="stylesheet" href="beyondia.css?v=ea602cb5aa">
+<script src="beyondia.js?v=f48995bbe0" defer></script>
 </head>
 <body>
 <div class="page">
@@ -114,17 +114,25 @@
       <div class="sec-head">
         <p class="kicker">Apply</p>
         <h2 id="apply-title" class="h2">Become a member.</h2>
-        <p class="p mute" style="margin-top: 24px">Tell us who you are and what draws you to the idea. Your application goes straight to the creator of Beyondia, and the answer comes by email.</p>
+        <p class="p mute" style="margin-top: 24px">Tell us who you are and what draws you to the idea. Your application goes to Beyondia by email, and the answer comes the same way.</p>
       </div>
 
       <div class="g2">
         <div>
           <p class="label" style="padding-top: 8px; color: var(--mute)">Your application</p>
-          <p class="small mute" style="margin-top: 16px; max-width: 18em">All four fields are required. Your details go only to the creator of Beyondia and are used only to answer you.</p>
+          <p class="small mute" style="margin-top: 16px; max-width: 18em">All four fields are required. Sending opens your email app with the application written out, ready to go to beyondia.official@gmail.com. Your details are used only to answer you.</p>
         </div>
         <div>
-          <!-- The address of the mail sender (forms/application.gs). Setup and how to change it: forms/README.md -->
-          <form id="apply-form" class="apply" action="https://script.google.com/macros/s/YOUR-DEPLOYMENT-ID/exec" method="post" accept-charset="utf-8">
+          <noscript>
+            <div class="apply-next apply-nojs">
+              <p class="label">Apply by email</p>
+              <p class="p">This form needs JavaScript to write your email. Instead, <a href="mailto:beyondia.official@gmail.com?subject=New%20member%20application&amp;body=Name%3A%20%0D%0AEmail%3A%20%0D%0APhone%3A%20%0D%0A%0D%0AMessage%3A%0D%0A">write to beyondia.official@gmail.com</a> with your name, email, phone and a few words about yourself.</p>
+            </div>
+          </noscript>
+          <!-- Applications are emails from the visitor's own email app (mailto:), so no server or outside service is involved.
+               The page script reads the address from this action; the same address is written in the texts and links
+               around the form (the tests check that they all agree). -->
+          <form id="apply-form" class="apply" action="mailto:beyondia.official@gmail.com?subject=Application%20to%20Beyondia" method="post" enctype="text/plain">
             <div class="field">
               <label for="apply-name">Name</label>
               <input id="apply-name" name="name" type="text" autocomplete="name" maxlength="100" required>
@@ -140,22 +148,30 @@
             </div>
             <div class="field">
               <label for="apply-message">Message</label>
-              <textarea id="apply-message" name="message" rows="6" maxlength="3000" aria-describedby="apply-message-hint" required></textarea>
+              <textarea id="apply-message" name="message" rows="6" maxlength="2000" aria-describedby="apply-message-hint" required></textarea>
               <p id="apply-message-hint" class="hint">Who you are, and what brings you to Beyondia.</p>
             </div>
-            <div class="hp" aria-hidden="true">
-              <label for="apply-website">Leave this field empty</label>
-              <input id="apply-website" name="website" type="text" tabindex="-1" autocomplete="off">
-            </div>
             <div class="apply-send">
-              <button class="btn btn-solid" type="submit">Send application</button>
+              <button class="btn btn-solid" type="submit">Send by email</button>
               <p id="apply-status" class="apply-status" role="status"></p>
             </div>
           </form>
-          <div id="apply-done" class="apply-done" hidden>
-            <p class="label">Application sent</p>
-            <h3 id="apply-done-title" class="h3-lg" tabindex="-1">Thank you<span data-apply-name></span>.</h3>
-            <p class="p">Your application has reached Beyondia. The answer will come to <strong data-apply-email>your email</strong>.</p>
+          <div id="apply-next" class="apply-next" hidden>
+            <p class="label">One more step</p>
+            <h3 id="apply-next-title" class="h3-lg" tabindex="-1">Now press Send.</h3>
+            <p class="p">Your email app has opened a message to <a href="mailto:beyondia.official@gmail.com">beyondia.official@gmail.com</a> with your application in it. It reaches Beyondia once you send it.</p>
+            <details class="apply-manual">
+              <summary>No email app opened?</summary>
+              <p class="small">Copy your application and send it from your email to beyondia.official@gmail.com.</p>
+              <div class="field">
+                <label for="apply-copy-text">Your application</label>
+                <textarea id="apply-copy-text" rows="9" readonly></textarea>
+              </div>
+              <div class="apply-send">
+                <button id="apply-copy" class="btn btn-ghost" type="button">Copy application</button>
+                <p id="apply-copy-status" class="apply-status" role="status"></p>
+              </div>
+            </details>
           </div>
         </div>
       </div>
