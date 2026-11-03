@@ -66,8 +66,8 @@ class DetectionTests(RealCopyCase):
         self.assertTrue(any("uses font 'IBM Plex Mono' but has no @font-face" in p for p in self.problems()))
 
     def test_a_page_may_not_ask_a_third_party_for_fonts(self):
-        self.edit("plans.html", '<link rel="stylesheet" href="beyondia.css">',
-                  '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost"><link rel="stylesheet" href="beyondia.css">')
+        self.edit("plans.html", '<link rel="stylesheet" href="beyondia.css',
+                  '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost"><link rel="stylesheet" href="beyondia.css')
         self.assertTrue(any("asks a third party for fonts" in p and p.startswith("plans.html") for p in self.problems()))
 
     def test_two_h1(self):

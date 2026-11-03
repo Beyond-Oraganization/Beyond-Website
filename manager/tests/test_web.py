@@ -491,7 +491,7 @@ class PublishApiTests(GitCase):
         git_info = self.client.state()["status"]["git"]
         self.assertEqual(git_info["branch"], "main")
         self.assertTrue(git_info["origin"])
-        self.assertEqual(sorted(git_info["changed"]), ["index.html", "search-index.js", "site.config.json"])
+        self.assertEqual(sorted(git_info["changed"]), ["index.html", "search-index.js", "search.html", "site.config.json"])
 
     def test_dry_run_then_publish(self):
         self.client.edit("tile.visible", {"tile_id": "creator", "visible": False})

@@ -305,7 +305,7 @@ def _check_page_quality(name: str, info: PageInfo) -> List[str]:
             problems.append(f"{name}: image {src} has no alt text (use alt=\"\" if it is decoration)")
         if not (attrs.get("width") and attrs.get("height")):
             problems.append(f"{name}: image {src} has no width and height (the page jumps while it loads)")
-    if "beyondia.js" not in info.scripts:
+    if "beyondia.js" not in [urlsplit(s).path for s in info.scripts]:
         problems.append(f"{name}: does not load beyondia.js")
     return problems
 
