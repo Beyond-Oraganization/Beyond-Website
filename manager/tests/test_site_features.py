@@ -351,48 +351,51 @@ class RealSiteFeatureTests(unittest.TestCase):
 
 
 class ApplicationFormTests(unittest.TestCase):
-    """The form on the community page, the page script and the mail sender (forms/application.gs) agree."""
+    """The form on the community page opens an email to Beyondia (no server, no outside service), and the
+    page and its script (beyondia.js) agree on the fields and their limits."""
 
     FIELDS = ["name", "email", "phone", "message"]
+    ADDRESS = "beyondia.official@gmail.com"
 
     @classmethod
     def setUpClass(cls):
         page = (SITE_DIR / "community.html").read_text(encoding="utf-8")
         cls.form = re.search(r'<form id="apply-form"[^>]*>.*?</form>', page, re.S).group(0)
         cls.script = (SITE_DIR / "beyondia.js").read_text(encoding="utf-8")
-        cls.sender = (SITE_DIR / "forms" / "application.gs").read_text(encoding="utf-8")
 
-    def list_in(self, text, name):
-        return json.loads(re.search(rf"var {name} = (\[[^\]]*\]);", text).group(1).replace("'", '"'))
+    def test_it_opens_an_email_to_beyondia(self):
+        self.assertRegex(self.form, rf'action="mailto:{re.escape(self.ADDRESS)}\?subject=[^"]+" method="post" enctype="text/plain"')
 
-    def limits_in(self, text):
-        found = re.search(r"var LIMITS = \{([^}]*)\};", text).group(1)
-        return {key: int(value) for key, value in re.findall(r"(\w+): (\d+)", found)}
+    def test_every_address_on_the_page_is_the_same(self):
+        page = (SITE_DIR / "community.html").read_text(encoding="utf-8")
+        addresses = re.findall(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", page)    # in links and in the text alike
+        self.assertGreaterEqual(len(addresses), 6)
+        self.assertEqual(set(addresses), {self.ADDRESS})
 
-    def test_it_posts_to_an_apps_script_web_app(self):
-        self.assertRegex(self.form, r'action="https://script\.google\.com/macros/s/[A-Za-z0-9_-]+/exec" method="post"')
+    def test_without_script_a_plain_email_link_takes_the_place_of_the_form(self):
+        page = (SITE_DIR / "community.html").read_text(encoding="utf-8")
+        noscript = re.search(r"<noscript>(.*?)</noscript>", page, re.S).group(1)
+        self.assertIn(f'href="mailto:{self.ADDRESS}?subject=', noscript)
+        css = (SITE_DIR / "beyondia.css").read_text(encoding="utf-8")
+        self.assertIn("html:not(.js) .apply{display:none}", css)
 
-    def test_every_field_is_labelled_required_and_known_to_both_scripts(self):
-        self.assertEqual(self.list_in(self.script, "FIELDS"), self.FIELDS)
-        self.assertEqual(self.list_in(self.sender, "FIELDS"), self.FIELDS)
+    def test_every_field_is_labelled_required_and_known_to_the_script(self):
+        fields = json.loads(re.search(r"var FIELDS = (\[[^\]]*\]);", self.script).group(1))
+        self.assertEqual(fields, self.FIELDS)
         for name in self.FIELDS:
             control = re.search(rf'<(?:input|textarea) id="apply-{name}" name="{name}"[^>]*>', self.form)
             self.assertIsNotNone(control, name)
             self.assertIn(" required", control.group(0), name)
             self.assertIn(f'<label for="apply-{name}">', self.form, name)
-            self.assertIn(f"params.{name}", self.sender, name)
+        self.assertEqual(re.findall(r' name="([^"]+)"', self.form), self.FIELDS)   # nothing else goes into the email
 
     def test_the_length_limits_match(self):
-        limits = self.limits_in(self.sender)
-        self.assertEqual(self.limits_in(self.script), limits)
+        found = re.search(r"var LIMITS = \{([^}]*)\};", self.script).group(1)
+        limits = {key: int(value) for key, value in re.findall(r"(\w+): (\d+)", found)}
+        self.assertEqual(sorted(limits), sorted(self.FIELDS))
         for name in self.FIELDS:
             control = re.search(rf'id="apply-{name}"[^>]*>', self.form).group(0)
             self.assertIn(f'maxlength="{limits[name]}"', control, name)
-
-    def test_the_bot_trap_is_hidden_and_checked(self):
-        self.assertRegex(self.form, r'(?s)<div class="hp" aria-hidden="true">.*?name="website"[^>]*tabindex="-1"')
-        self.assertIn("params.website", self.sender)
-
 
 if __name__ == "__main__":
     unittest.main()
