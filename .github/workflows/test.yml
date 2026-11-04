@@ -9,14 +9,23 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Keep the check names "test (3.9)" and "test (3.12)" whatever runner they use.
+    name: test (${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.12"]
+        include:
+          # 3.9 is the oldest Python the manager supports. actions/python-versions
+          # has no 3.9 build for Ubuntu 26.04 (ubuntu-latest), so this job stays on
+          # the newest image that has one.
+          - python-version: "3.9"
+            os: ubuntu-24.04
+          - python-version: "3.12"
+            os: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
       - name: Unit, integration and site tests
