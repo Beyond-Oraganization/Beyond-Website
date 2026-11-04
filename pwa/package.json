@@ -18,6 +18,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "lighthouse": "node scripts/lighthouse.mjs",
     "icons": "node scripts/icons.mjs",
     "screenshots": "node scripts/screenshots.mjs",
     "record-fixtures": "node scripts/record-fixtures.mjs",

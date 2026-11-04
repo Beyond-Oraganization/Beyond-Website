@@ -138,7 +138,7 @@ export default function Connect() {
     try {
       url = normalizeUrl(values.url)
     } catch {
-      return setError('url', { message: 'Enter the bot’s address, like https://34.120.0.10:8443.' })
+      return setError('url', { message: 'Enter the bot’s address, like https://203.0.113.10:8443.' })
     }
     if (url.startsWith('http://') && !isLoopback(url)) return setError('url', { message: 'Use https:// (only a tunnel on this device may use http://).' })
     const result = await runCommand({ url, key: values.key.trim() }, cmd.status())
@@ -186,11 +186,11 @@ export default function Connect() {
             <TextField
               id="c-url"
               label="Address"
-              hint="The server and port, e.g. https://34.120.0.10:8443. On a Google Cloud VM this is its static IP."
+              hint="The server and port, e.g. https://203.0.113.10:8443. On a Google Cloud VM this is its static IP."
               error={errors.url?.message}
               inputMode="url"
               autoComplete="url"
-              placeholder="https://34.120.0.10:8443"
+              placeholder="https://203.0.113.10:8443"
               registration={register('url', { required: 'Enter the bot’s address.' })}
             />
             <TextField

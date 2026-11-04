@@ -51,6 +51,35 @@ node manager/tools/make_pdf.js treatise.html treatise.pdf   # refresh the treati
 
 **Set the real address.** `site.url` in `site.config.json` (it ends with a slash) is what canonical links, the sharing image, the sitemap and the feed use. It is currently set to the likely GitHub Pages address, `https://beyond-oraganization.github.io/Beyond-Website/`; change it if the site lives elsewhere, then run `manager/bm build`. Leave it empty and those four things are simply left out.
 
+## The Beyond Bot app
+
+`app/` is **Beyond Bot**, an installable web app (PWA) for the trading bot of `techbot.html`: <https://beyond-oraganization.github.io/Beyond-Website/app/>. It speaks only the bot's HTTPS command API (`beyondbot serve`) and covers every command and every view of the bot's terminal UI: session, trading, markets with charts, backtests, orders, strategies, a console, system health and the bot's account. It uses this site's colours, fonts and both themes, and shares the theme choice with it.
+
+Its source is `pwa/` (React, TypeScript, Vite). `app/` is the build, committed like the site's other generated files; CI rebuilds it and fails if it differs, so **after editing `pwa/`, rebuild and commit `app/`**:
+
+```sh
+cd pwa
+npm ci                 # once
+npm run dev:mock       # the app on http://localhost:5173 with a simulated bot (address http://127.0.0.1:8443, key printed)
+npm run build          # writes ../app
+npm test               # unit and component tests
+npx playwright install chromium && npm run test:e2e   # after a build: flows, axe in both themes, offline start, installability
+npm run lighthouse     # after a build: Lighthouse's mobile performance, at least 90
+```
+
+`npm run icons` and `npm run screenshots` regenerate the icons, splash screens and install screenshots in `pwa/public/`; `npm run record-fixtures` saves a real bot's answers (redacted) for the parser tests. The site's own tools (`bm check`, the sitemap, the search index, the axe audit) look only at the pages in the root, so the app has its own checks.
+
+**Connecting a bot.** On the bot's server, allow the app's origin and restart the bot:
+
+```sh
+echo 'BEYONDBOT_API_ORIGINS=https://beyond-oraganization.github.io' | sudo tee -a /etc/beyondbot.env
+sudo systemctl restart beyondbot
+```
+
+Then, on each device: trust the bot's certificate once (the bot's README, "Trusting the certificate"), make sure the firewall lets the device reach port 8443, and enter the bot's address and API key in the app (Connect). The key is kept encrypted under a passphrase by default.
+
+**Installing it.** On Android, Windows, macOS, Linux and ChromeOS, Chrome or Edge offer **Install** (the app's own button, or the address bar). On iPhone and iPad: Safari → Share → **Add to Home Screen**; install it *before* connecting, because the installed app keeps its own storage apart from Safari. On a Mac, Safari → File → **Add to Dock**. Firefox on computers cannot install web apps; the app says so and suggests another browser. Once installed it has its own icon and window, starts offline with the last data it saw, and offers each new version with a Reload button.
+
 ## The application form
 
 The **Apply** section of `community.html` asks for a name, email, phone and message. The site has no server and uses no outside service, so an application travels as an email from the visitor's own email app (the `mailto:` protocol): **Send by email** opens a new message to beyondia.official@gmail.com with the subject *New member application: <name>* and the details laid out in plain text, and the visitor presses Send. Pressing Reply answers them directly.

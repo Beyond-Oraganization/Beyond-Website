@@ -1,0 +1,48 @@
+name: Beyond Bot app
+
+on:
+  push:
+    paths: ["pwa/**", "app/**", "beyondia.css", "fonts/**", ".github/workflows/app.yml"]
+  pull_request:
+    paths: ["pwa/**", "app/**", "beyondia.css", "fonts/**", ".github/workflows/app.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pwa
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: pwa/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Types and lint
+        run: npm run typecheck && npm run lint
+      - name: Unit and component tests (parsers, queue, vault, tokens and contrast, install assets, screen states)
+        run: npm test
+      - name: Build (also checks Jekyll-safe names, the CSP and the manifest id)
+        run: npm run build
+      - name: The committed app/ is this build
+        run: |
+          git status --porcelain -- ../app
+          test -z "$(git status --porcelain -- ../app)" || { echo "app/ differs from a fresh build: run 'npm run build' in pwa/ and commit app/."; exit 1; }
+      - name: Install a browser
+        run: npx playwright install --with-deps chromium
+      - name: End to end, axe in both themes, offline start and installability
+        run: npm run test:e2e
+      - name: Lighthouse mobile performance, at least 90
+        run: npm run lighthouse
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: pwa/test-results/
+          retention-days: 7
