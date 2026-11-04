@@ -1,0 +1,140 @@
+import { create } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
+import { db } from './db.ts'
+import { seal, unseal, type Sealed } from './vault.ts'
+
+/** How the API key is kept: sealed under a passphrase (default), sealed with a device key, or not at all. */
+export type KeyStorage = 'passphrase' | 'device' | 'session'
+
+export type Connection = {
+  id: string
+  name: string
+  url: string
+  storage: KeyStorage
+  sealed: Sealed | null
+  addedAt: number
+  lastOkAt?: number
+  botVersion?: string | null
+}
+
+type Saved = { connections: Connection[]; activeId: string | null }
+
+type ConnectionState = Saved & {
+  loaded: boolean
+  /** Unsealed API keys, in memory only. */
+  keys: Record<string, string>
+  load: () => Promise<void>
+  add: (input: { name: string; url: string; key: string; storage: KeyStorage; passphrase?: string }) => Promise<Connection>
+  update: (id: string, patch: Partial<Omit<Connection, 'id'>>) => Promise<void>
+  replaceKey: (id: string, key: string, storage: KeyStorage, passphrase?: string) => Promise<void>
+  remove: (id: string) => Promise<void>
+  setActive: (id: string | null) => Promise<void>
+  unlock: (id: string, passphrase: string) => Promise<void>
+  enterKey: (id: string, key: string) => void
+  lock: () => void
+}
+
+const SAVED = 'connections'
+const newId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`)
+
+/** The bot's address, as typed: https://IP:8443 is the usual form; a bare host gets https://. */
+export function normalizeUrl(input: string): string {
+  const value = input.trim()
+  const withScheme = /^https?:\/\//i.test(value) ? value : `https://${value}`
+  const url = new URL(withScheme)
+  return url.toString().replace(/\/$/, url.pathname === '/' ? '' : '/')
+}
+
+export const useConnections = create<ConnectionState>((set, get) => {
+  const save = () => db.set(SAVED, { connections: get().connections, activeId: get().activeId } satisfies Saved)
+
+  return {
+    loaded: false,
+    connections: [],
+    activeId: null,
+    keys: {},
+
+    async load() {
+      const saved = (await db.get<Saved>(SAVED)) ?? { connections: [], activeId: null }
+      const keys: Record<string, string> = {}
+      for (const connection of saved.connections) {
+        if (connection.storage === 'device' && connection.sealed) {
+          try {
+            keys[connection.id] = await unseal(connection.id, connection.sealed)
+          } catch {
+            // the device key is gone (storage cleared): the key must be entered again
+          }
+        }
+      }
+      set({ ...saved, keys, loaded: true })
+    },
+
+    async add({ name, url, key, storage, passphrase }) {
+      const id = newId()
+      const sealed = storage === 'session' ? null : await seal(id, key.trim(), storage === 'passphrase' ? (passphrase ?? '') : null)
+      const connection: Connection = { id, name: name.trim() || new URL(normalizeUrl(url)).host, url: normalizeUrl(url), storage, sealed, addedAt: Date.now() }
+      set({ connections: [...get().connections, connection], activeId: id, keys: { ...get().keys, [id]: key.trim() } })
+      await save()
+      return connection
+    },
+
+    async update(id, patch) {
+      set({ connections: get().connections.map((c) => (c.id === id ? { ...c, ...patch, url: patch.url ? normalizeUrl(patch.url) : c.url } : c)) })
+      await save()
+    },
+
+    async replaceKey(id, key, storage, passphrase) {
+      const sealed = storage === 'session' ? null : await seal(id, key.trim(), storage === 'passphrase' ? (passphrase ?? '') : null)
+      set({ connections: get().connections.map((c) => (c.id === id ? { ...c, storage, sealed } : c)), keys: { ...get().keys, [id]: key.trim() } })
+      await save()
+    },
+
+    async remove(id) {
+      const connections = get().connections.filter((c) => c.id !== id)
+      const keys = { ...get().keys }
+      delete keys[id]
+      set({ connections, keys, activeId: get().activeId === id ? (connections[0]?.id ?? null) : get().activeId })
+      await save()
+      // Everything this device remembered about that bot goes too.
+      await db.delPrefixed(`cache:${id}:`)
+      await db.del(`ticks:${id}`)
+      await db.del(`activity:${id}`)
+      await db.del(`backtests:${id}`)
+    },
+
+    async setActive(id) {
+      set({ activeId: id })
+      await save()
+    },
+
+    async unlock(id, passphrase) {
+      const connection = get().connections.find((c) => c.id === id)
+      if (!connection?.sealed) throw new Error('This connection has no stored key.')
+      const key = await unseal(id, connection.sealed, passphrase)
+      set({ keys: { ...get().keys, [id]: key } })
+    },
+
+    enterKey(id, key) {
+      set({ keys: { ...get().keys, [id]: key.trim() } })
+    },
+
+    /** Forgets every key that needs a passphrase or was only typed in (device-sealed keys stay open). */
+    lock() {
+      const keys: Record<string, string> = {}
+      for (const connection of get().connections) {
+        const key = get().keys[connection.id]
+        if (key && connection.storage === 'device') keys[connection.id] = key
+      }
+      set({ keys })
+    },
+  }
+})
+
+export function useActive() {
+  return useConnections(
+    useShallow((state) => {
+      const connection = state.connections.find((c) => c.id === state.activeId) ?? null
+      return { connection, key: connection ? (state.keys[connection.id] ?? null) : null }
+    }),
+  )
+}
