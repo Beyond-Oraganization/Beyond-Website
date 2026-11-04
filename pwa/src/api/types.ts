@@ -99,8 +99,10 @@ export type SessionStats = {
   losses: number
 }
 
-export type Signal = { action: 'None' | 'Open' | 'CloseNewest'; side: OrderSide; balanceShare: number }
-export type InsightValue = { name: string; value: number }
+/** A close names its side; a bot from before rules closed the newest position of any side ('CloseNewest'). */
+export type Signal = { action: 'None' | 'Open' | 'Close' | 'CloseNewest'; side: OrderSide; balanceShare: number }
+/** `isLevel`: a price level the candle was compared with, such as a band (bots from before rules send no flag). */
+export type InsightValue = { name: string; value: number; isLevel?: boolean }
 export type StrategyInsight = { signal: Signal; reason: string; values: InsightValue[] }
 
 export type Candle = {
@@ -148,6 +150,8 @@ export type TradingSessionState = {
   market: MarketIdJson
   strategy: string
   parameters: Record<string, number>
+  /** The rules it trades by, in order (a bot from before rules sends none). */
+  rules?: string[]
   startedAt: Iso
   ticks: number
   trades: number

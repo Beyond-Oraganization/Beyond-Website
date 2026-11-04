@@ -59,7 +59,7 @@ async function record(name, args) {
 
 const status = await record('status', ['status'])
 const markets = await record('market-list', ['market', 'list'])
-await record('strategies', ['strategies'])
+await record('strategies', ['strategies', '--json'])
 const session = await record('session', ['session', '--json'])
 await record('orders', ['orders', 'list'])
 await record('orders-broker', ['orders', 'list', '--broker'])

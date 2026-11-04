@@ -69,6 +69,25 @@ test('backtests, draws the balance over time and keeps the run', async ({ page }
   await expect(page.getByRole('button', { name: 'Show' }).first()).toBeVisible()
 })
 
+test('backtests rules of its own, built from the strategy’s syntax, and shows the bot’s message for a band it has not got', async ({ page }) => {
+  await connected(page)
+  await page.goto('#/backtest')
+  const first = page.getByRole('group', { name: 'Rule 1' })
+  await first.getByRole('combobox', { name: 'Rule 1: long or short' }).selectOption('short')
+  await first.getByRole('combobox', { name: 'Rule 1: up or down' }).selectOption('down')
+  await first.getByRole('combobox', { name: 'Rule 1: lower or upper' }).selectOption('upper')
+  const second = page.getByRole('group', { name: 'Rule 2' })
+  await second.getByRole('combobox', { name: 'Rule 2: long or short' }).selectOption('short')
+  await second.getByRole('combobox', { name: 'Rule 2: up or down' }).selectOption('up')
+  await second.getByRole('combobox', { name: 'Rule 2: lower or upper' }).selectOption('upper')
+  await expect(page.getByText('Your rules', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Run the backtest' }).click()
+  await expect(page.getByRole('list').filter({ hasText: 'open short on cross down upper 1' }).first()).toBeVisible()
+  await first.getByRole('spinbutton').fill('3')
+  await page.getByRole('button', { name: 'Run the backtest' }).click()
+  await expect(page.getByText(/upper 3 is not a band of the envelope/).first()).toBeVisible()
+})
+
 test('stops and starts trading, each after a confirmation', async ({ page }) => {
   await connected(page)
   await page.goto('#/trading')
@@ -140,7 +159,8 @@ for (const theme of ['classic', 'light'] as const) {
     await connected(page)
     for (const route of ['', 'trading', 'markets', 'markets/XAUUSD/1h', 'backtest', 'orders', 'strategies', 'console', 'system', 'settings', 'account', 'connections', 'install', 'connect']) {
       await page.goto(`#/${route}`)
-      await page.locator('main h1').first().waitFor()
+      // The screen being left can stay in the page, hidden, while the next one loads: wait for a visible heading.
+      await page.locator('main h1').filter({ visible: true }).first().waitFor()
       await page.waitForTimeout(800)
       const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice']).exclude('.chart').analyze()
       expect(results.violations.map((v) => `${route || 'session'}: ${v.id} (${v.nodes.length}) ${v.nodes[0]?.target}`)).toEqual([])

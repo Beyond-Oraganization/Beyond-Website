@@ -30,11 +30,12 @@ export const realBacktest: CommandResult = {
         },
       ],
     },
-    { type: 'text', text: 'depth=23 deviation=1 moving-count=2 trigger=1' },
+    { type: 'text', text: 'depth=23 deviation=1 moving-count=2, rules: open long on cross up lower 1; close long on cross down lower 1' },
   ],
 }
 
-export const realStrategies: CommandResult = {
+/** `strategies` of a bot from before rules (no --json): the panels the app falls back to. */
+export const legacyStrategies: CommandResult = {
   ...base,
   command: 'strategies',
   blocks: [
@@ -97,4 +98,27 @@ export const realSignedOut: CommandResult = {
   command: 'session --json',
   blocks: [],
   error: { message: 'You need to log in first.', hint: "Run 'login' (or 'register' to create an account)." },
+}
+
+/** `strategies --json` as the bot prints it (Beyond-Bot-Bybit 9af5cd0, Cli/Rendering/StrategyCatalogJson.cs); `json` is that output parsed. */
+export const realStrategiesJson: CommandResult = {
+  ...base,
+  command: 'strategies --json',
+  blocks: [],
+  json: [
+    {
+      name: 'drcs',
+      title: 'Double Red Cross',
+      description:
+        'Builds an adaptive envelope of bands spaced by ATR × deviation below and above the EMA: lower 1 and upper 1 are nearest the center, up to moving-count on each side. Its rules trade on candles crossing those bands, and each open spends half of the balance. By default it buys when a candle opens below lower 1 and closes above it, and closes the newest long when a candle crosses back down through it.',
+      symbol: 'XAUUSD',
+      interval: '1h',
+      parameters: [
+        { name: 'depth', description: 'Lookback of the EMA and ATR the envelope is built from', default: 23, minimum: 1, maximum: 500, wholeNumber: true },
+        { name: 'deviation', description: 'ATR multiplier between neighbouring bands', default: 1, minimum: 1, maximum: 20, wholeNumber: true },
+        { name: 'moving-count', description: 'Number of bands on each side of the center', default: 2, minimum: 1, maximum: 10, wholeNumber: true },
+      ],
+      rules: { defaults: ['open long on cross up lower 1', 'close long on cross down lower 1'], syntax: 'open|close long|short on cross up|down lower|upper N' },
+    },
+  ],
 }

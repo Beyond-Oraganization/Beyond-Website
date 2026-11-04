@@ -192,3 +192,22 @@ code.mono{padding:0 4px;font-size:.92em;background:color-mix(in srgb,var(--fg) 9
 .tabs{margin-bottom:28px}
 details.more-box{border-top:3px solid var(--line2);padding-top:12px}
 details.more-box>summary{cursor:pointer;padding:10px 0;font:700 13px/1.4 var(--f-t);letter-spacing:.08em;text-transform:uppercase}
+
+/* The rule editor: one numbered row per rule, read as a sentence: its positions as controls, in the order the bot's syntax gives them. */
+.rules-field>legend{margin-bottom:10px;font:700 13px/1.4 var(--f-t);letter-spacing:.1em;text-transform:uppercase}
+.rules{display:grid;gap:14px;margin:6px 0 4px;padding:0;list-style:none}
+.rule{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px 14px;align-items:start;padding:14px;border:3px solid var(--fg);background:color-mix(in srgb,var(--bg) 70%,#fff)}
+.rule-n{min-width:28px;font:700 15px/44px var(--f-t);text-align:center}
+.rule .link{justify-self:start}
+.rules-field .rule-parts{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
+.rules-field .rule-parts select,.rules-field .rule-parts input,.rules-field .rule-text{display:inline-block;width:auto;min-height:44px;margin:0;padding:8px 12px;border:3px solid var(--fg);border-radius:0;background-color:color-mix(in srgb,var(--bg) 55%,#fff);color:var(--fg);font:500 16px/1.3 var(--f-t);box-shadow:none}
+.rules-field .rule-parts select{appearance:none;padding-right:34px;background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 12px) 50%;background-size:6px 6px;background-repeat:no-repeat}
+.rules-field .rule-parts .rule-number{width:5.5em}
+.rules-field .rule-text{display:block;width:100%}
+.rules-field .rule-parts [aria-invalid="true"],.rules-field .rule-text[aria-invalid="true"]{border-color:var(--accent);box-shadow:none}
+.rules-field .rule-parts select:focus,.rules-field .rule-parts input:focus,.rules-field .rule-text:focus{outline:3px solid var(--fg);outline-offset:0;box-shadow:none}
+.rule-word{font:700 13px/1 var(--f-t);letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.rule-tools{display:flex;gap:6px}
+.rule-tools .icon-btn{min-width:44px;height:44px;padding:0 8px}
+@container (max-width:560px){.rule{grid-template-columns:auto minmax(0,1fr)}.rule-tools{grid-column:2}}
+.rule-list{display:grid;gap:6px;margin:0;padding-left:1.6em;font-size:15px;line-height:1.45}

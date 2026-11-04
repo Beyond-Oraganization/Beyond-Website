@@ -35,14 +35,17 @@ const DRCS = {
   name: 'drcs',
   title: 'Double Red Cross',
   description:
-    'Builds an adaptive envelope of bands spaced by ATR × deviation below and above the EMA. Buys half of the balance when a candle opens below the trigger band and closes above it, and closes the newest position when a candle crosses back down through it.',
+    'Builds an adaptive envelope of bands spaced by ATR × deviation below and above the EMA: lower 1 and upper 1 are nearest the center, up to moving-count on each side. Its rules trade on candles crossing those bands, and each open spends half of the balance. By default it buys when a candle opens below lower 1 and closes above it, and closes the newest long when a candle crosses back down through it.',
   market: { symbol: 'XAUUSD', interval: '1h' },
   parameters: [
     { name: 'depth', description: 'Lookback of the EMA and ATR the envelope is built from', default: 23, min: 1, max: 500 },
     { name: 'deviation', description: 'ATR multiplier between neighbouring bands', default: 1, min: 1, max: 20 },
     { name: 'moving-count', description: 'Number of bands on each side of the center', default: 2, min: 1, max: 10 },
-    { name: 'trigger', description: 'Which lower band (1 = nearest the center) triggers signals', default: 1, min: 1, max: 10 },
   ],
+  // Strategies/Drcs: the rules it trades by when none are given, and how a rule is written (Strategies/Rules).
+  rules: ['open long on cross up lower 1', 'close long on cross down lower 1'],
+  syntax: 'open|close long|short on cross up|down lower|upper N',
+  balanceShare: 0.5,
 }
 
 /** A command that ended with this exit code, message and hint (Cli/ErrorReporter.cs). */
@@ -248,36 +251,69 @@ export function createBot(options = {}) {
       if (!Number.isInteger(value)) throw new Exit(1, `${p.name} must be a whole number; got ${F.plain(value)}.`)
       values[p.name] = value
     }
-    if (values.trigger > values['moving-count']) throw new Exit(1, 'Moving trigger number cannot be greater than the total number of moving lines.')
     return values
   }
-  const describeParams = (p) => Object.entries(p).map(([k, v]) => `${k}=${F.plain(v)}`).join(' ')
+  // Strategies/Rules/TradingRule.cs, LineCross.cs and EnvelopeBand.cs: "open|close long|short on cross up|down lower|upper N".
+  const RULE_FORM = 'open|close long|short on'
+  const CONDITION_SYNTAX = 'cross up|down lower|upper N'
+  function parseRule(text, values) {
+    const words = text.trim().split(/\s+/)
+    const [action, side, on, ...rest] = words
+    if (words.length < 4 || !/^(open|close)$/i.test(action) || !/^(long|short)$/i.test(side) || !/^on$/i.test(on))
+      throw new Exit(1, `'${text.trim()}' is not a rule: write ${RULE_FORM} CONDITION.`)
+    const condition = rest.join(' ')
+    const [keyword, direction, ...line] = rest
+    if (rest.length < 3 || !/^cross$/i.test(keyword) || !/^(up|down)$/i.test(direction))
+      throw new Exit(1, `Rule '${text.trim()}': '${condition}' is not a condition: write ${CONDITION_SYNTAX}.`)
+    const band = line.join(' ')
+    if (line.length !== 2 || !/^(lower|upper)$/i.test(line[0]) || !/^\d+$/.test(line[1]))
+      throw new Exit(1, `Rule '${text.trim()}': '${band}' is not a band: write lower N or upper N.`)
+    const number = Number(line[1])
+    const name = `${line[0].toLowerCase()} ${number}`
+    if (number < 1 || number > values['moving-count'])
+      throw new Exit(1, `Rule '${text.trim()}': ${name} is not a band of the envelope: it has bands 1 to ${values['moving-count']} on each side.`)
+    return { action: action.toLowerCase(), side: side.toLowerCase(), up: direction.toLowerCase() === 'up', lower: line[0].toLowerCase() === 'lower', number, line: name, text: `${action.toLowerCase()} ${side.toLowerCase()} on cross ${direction.toLowerCase()} ${name}` }
+  }
+  const rulesOf = (texts, values) => {
+    const split = texts.flatMap((text) => text.split(';')).map((text) => text.trim()).filter(Boolean)
+    return (split.length ? split : DRCS.rules).map((text) => parseRule(text, values))
+  }
+  const describeParams = (p, rules) => `${Object.entries(p).map(([k, v]) => `${k}=${F.plain(v)}`).join(' ')}, rules: ${rules.map((r) => r.text).join('; ')}`
   const p5 = (v) => v.toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 5 })
-  function explain(candles, i, p, cache) {
+  // Strategies/Rules/RuleStrategy.cs: the first rule whose condition holds gives the signal.
+  function explain(candles, i, p, rules, cache) {
     const { ema, atr } = cache ?? indicators(candles, p.depth)
     const c = candles[i]
-    const band = ema[i] - atr[i] * p.deviation * p.trigger
-    const where = (v) => (v > band ? 'above' : v < band ? 'below' : 'exactly on')
-    let signal = { action: 'None', side: 'Buy', balanceShare: 0 }
-    let reason = `No cross: opened ${where(c.open)} and closed ${where(c.close)} the trigger band (${p5(band)}).`
-    if (c.open < band && c.close > band) {
-      signal = { action: 'Open', side: 'Buy', balanceShare: 0.5 }
-      reason = `Opened below the trigger band (${p5(band)}) and closed above it.`
-    } else if (c.open > band && c.close < band) {
-      signal = { action: 'CloseNewest', side: 'None', balanceShare: 0 }
-      reason = `Opened above the trigger band (${p5(band)}) and closed below it.`
-    }
+    const where = (v, level) => (v > level ? 'above' : v < level ? 'below' : 'exactly on')
+    const checks = rules.map((rule) => {
+      const level = ema[i] + (rule.lower ? -1 : 1) * atr[i] * p.deviation * rule.number
+      const met = rule.up ? c.open < level && c.close > level : c.open > level && c.close < level
+      const reason = met
+        ? `opened ${where(c.open, level)} ${rule.line} (${p5(level)}) and closed ${where(c.close, level)} it`
+        : `opened ${where(c.open, level)} and closed ${where(c.close, level)} ${rule.line} (${p5(level)})`
+      return { rule, level, met, reason }
+    })
+    const fired = checks.find((check) => check.met)
+    const side = (rule) => (rule.side === 'long' ? 'Buy' : 'Sell')
+    const signal = !fired
+      ? { action: 'None', side: 'None', balanceShare: 0 }
+      : fired.rule.action === 'open'
+        ? { action: 'Open', side: side(fired.rule), balanceShare: DRCS.balanceShare }
+        : { action: 'Close', side: side(fired.rule), balanceShare: 0 }
+    const reason = fired ? `${fired.rule.text[0].toUpperCase()}${fired.rule.text.slice(1)}: ${fired.reason}.` : `No rule fired: ${[...new Set(checks.map((check) => check.reason))].join('; ')}.`
+    const levels = [...new Map(checks.map((check) => [check.rule.line, { name: check.rule.line, value: round(check.level, 6), isLevel: true }])).values()]
     const values = [
-      { name: 'open', value: c.open },
-      { name: 'close', value: c.close },
-      { name: `EMA(${p.depth})`, value: round(ema[i], 6) },
-      { name: `ATR(${p.depth})`, value: round(atr[i], 6) },
-      { name: 'band', value: round(band, 6) },
+      { name: 'open', value: c.open, isLevel: false },
+      { name: 'close', value: c.close, isLevel: false },
+      { name: `EMA(${p.depth})`, value: round(ema[i], 6), isLevel: false },
+      { name: `ATR(${p.depth})`, value: round(atr[i], 6), isLevel: false },
+      ...levels,
     ]
     return { signal, reason, values }
   }
+  const positionSide = (side) => (side === 'Buy' ? 'long' : 'short')
   const signalText = (signal) =>
-    signal.action === 'Open' ? `open ${signal.side.toLowerCase()} (${Math.round(signal.balanceShare * 100)} % of balance)` : signal.action === 'CloseNewest' ? 'close newest position' : 'none'
+    signal.action === 'Open' ? `open ${positionSide(signal.side)} (${Math.round(signal.balanceShare * 100)} % of balance)` : signal.action === 'Close' ? `close ${positionSide(signal.side)}` : 'none'
 
   // ---------- account ----------
   const symbolInfo = (symbol) => SYMBOLS[symbol] ?? { price: 100, quote: 'USD' }
@@ -339,17 +375,19 @@ export function createBot(options = {}) {
       session.ticks++
       return (session.lastTick = { ...base, outcome: 'NoNewCandle', candle: json, insight: null, candlesAdded: added, elapsed: F.span(4), nextTickAt })
     }
-    const insight = explain(market.candles, i, session.params)
+    const insight = explain(market.candles, i, session.params, session.rules)
     let trade = null
     if (!preview && insight.signal.action === 'Open') {
       const quantity = round((s.account.balance * insight.signal.balanceShare) / candle.close / 10, 2)
-      const order = open(market.symbol, 'Buy', Math.max(quantity, 0.01), 'drcs')
+      const order = open(market.symbol, insight.signal.side, Math.max(quantity, 0.01), 'drcs')
       session.positions.push(order.orderId)
       trade = { market: base.market, strategy: 'drcs', action: 'Opened', order: orderJson(order), time: base.time }
       session.trades++
-    } else if (!preview && insight.signal.action === 'CloseNewest') {
-      const id = session.positions.pop()
-      const position = s.positions.find((p) => p.orderId === id)
+    } else if (!preview && insight.signal.action === 'Close') {
+      // Trading/OrderExecutor.cs: the newest position this session opened on that side.
+      const mine = session.positions.map((id) => s.positions.find((p) => p.orderId === id)).filter((p) => p && p.side === insight.signal.side)
+      const position = mine.at(-1)
+      if (position) session.positions = session.positions.filter((id) => id !== position.orderId)
       if (position) {
         const { price } = closePosition(position, 'drcs')
         trade = { market: base.market, strategy: 'drcs', action: 'Closed', order: orderJson({ ...position, price, status: 'None' }), time: base.time }
@@ -412,7 +450,7 @@ export function createBot(options = {}) {
       strategies: [...s.sessions.values()].sort((a, b) => a.key.localeCompare(b.key)).map((x) => {
         const m = s.markets.get(x.key)
         return {
-          market: { symbol: m.symbol, interval: m.interval.name }, strategy: 'drcs', parameters: x.params, startedAt: new Date(x.startedAt).toISOString(),
+          market: { symbol: m.symbol, interval: m.interval.name }, strategy: 'drcs', parameters: x.params, rules: x.rules.map((r) => r.text), startedAt: new Date(x.startedAt).toISOString(),
           ticks: x.ticks, trades: x.trades, lastTick: x.lastTick, lastError: x.lastError, lastErrorAt: x.lastErrorAt, nextTickAt: new Date(nextBoundary(m.interval.ms)).toISOString(),
         }
       }),
@@ -441,7 +479,7 @@ export function createBot(options = {}) {
       }, { once: true })
     })
   const strategyInput = (argv, extra = {}) => {
-    const { pos, opt } = readArgs(argv, { '--symbol': { alias: '-s', value: true }, '--interval': { alias: '-i', value: true }, '--set': { alias: '-p', value: true, multiple: true }, '--defaults': { alias: '-d' }, ...extra })
+    const { pos, opt } = readArgs(argv, { '--symbol': { alias: '-s', value: true }, '--interval': { alias: '-i', value: true }, '--set': { alias: '-p', value: true, multiple: true }, '--rule': { alias: '-r', value: true, multiple: true }, '--defaults': { alias: '-d' }, ...extra })
     const name = pos[0] ?? 'drcs'
     if (name.toLowerCase() !== 'drcs') throw new Exit(1, `Unknown strategy '${name}'. Available: drcs (Double Red Cross).`)
     const values = {}
@@ -453,7 +491,8 @@ export function createBot(options = {}) {
     }
     const interval = parseInterval(opt.interval ?? DRCS.market.interval)
     if (!interval) throw intervalError(opt.interval)
-    return { symbol: String(opt.symbol ?? DRCS.market.symbol).trim().toUpperCase(), interval, params: params(values), opt }
+    const resolved = params(values)
+    return { symbol: String(opt.symbol ?? DRCS.market.symbol).trim().toUpperCase(), interval, params: resolved, rules: rulesOf(opt.rule ?? [], resolved), opt }
   }
   const insightPanel = (o, market, tickReport) =>
     o.section(`drcs on ${market.symbol} ${market.interval.code}`, (x) =>
@@ -467,11 +506,12 @@ export function createBot(options = {}) {
   const strategiesSection = (o, list, t) => {
     if (!list.length) return o.section('Strategies', (x) => x.text('No strategy is trading. Start one with: trading start drcs'))
     o.section(`Strategies (${list.length} running)`, (x) =>
-      x.table(['Market', 'Strategy', 'Parameters', 'Running', 'Ticks', 'Trades', 'Last signal', 'Next tick', 'Last error'], list.map((st) => {
+      x.table(['Market', 'Strategy', 'Parameters and rules', 'Running', 'Ticks', 'Trades', 'Last signal', 'Next tick', 'Last error'], list.map((st) => {
         const m = s.markets.get(st.key)
         const next = nextBoundary(m.interval.ms)
         const last = st.lastTick?.insight ? signalText(st.lastTick.insight.signal) : st.lastTick?.outcome ?? '–'
-        return [`${m.symbol} ${m.interval.code}`, 'drcs', describeParams(st.params), F.duration((t - st.startedAt) / 1000), String(st.ticks), String(st.trades), last, `${F.clock(next)} (in ${F.duration((next - t) / 1000)})`, st.lastError ?? 'none']
+        const parameters = Object.entries(st.params).map(([k, v]) => `${k}=${F.plain(v)}`).join(' ')
+        return [`${m.symbol} ${m.interval.code}`, 'drcs', `${parameters}\n${st.rules.map((r) => r.text).join('\n')}`, F.duration((t - st.startedAt) / 1000), String(st.ticks), String(st.trades), last, `${F.clock(next)} (in ${F.duration((next - t) / 1000)})`, st.lastError ?? 'none']
       })),
     )
   }
@@ -718,13 +758,26 @@ export function createBot(options = {}) {
       }))
       o.text(`Computed over all ${F.count(market.candles.length)} stored candles in ${F.elapsed(8 + rand() * 30)}.`)
     },
-    strategies: (o) => {
+    strategies: (o, argv) => {
+      const { opt } = readArgs(argv, { '--json': {} })
+      if (opt.json) {
+        // Cli/Rendering/StrategyCatalogJson.cs
+        const value = [{
+          name: DRCS.name, title: DRCS.title, description: DRCS.description, symbol: DRCS.market.symbol, interval: DRCS.market.interval,
+          parameters: DRCS.parameters.map((p) => ({ name: p.name, description: p.description, default: p.default, minimum: p.min, maximum: p.max, wholeNumber: true })),
+          rules: { defaults: DRCS.rules, syntax: DRCS.syntax },
+        }]
+        o.text(JSON.stringify(value, null, 2))
+        return { json: value }
+      }
       o.section(`${DRCS.name} – ${DRCS.title}`, (x) => {
         x.text(DRCS.description)
         x.text(`Default market: ${DRCS.market.symbol} ${DRCS.market.interval}`)
         x.table(['Parameter', 'Default', 'Range', 'Meaning'], DRCS.parameters.map((p) => [p.name, F.plain(p.default), `${F.plain(p.min)}–${F.plain(p.max)}`, p.description]))
+        x.text(`Default rules, tried in order (the first that fires gives the signal):\n${DRCS.rules.map((rule) => `  ${rule}`).join('\n')}`)
+        x.text(`Write a rule: ${DRCS.syntax}`)
       })
-      o.text('Set a parameter with --set NAME=VALUE, e.g. backtest drcs --set depth=30.')
+      o.text('Set a parameter with --set NAME=VALUE and replace the rules with --rule, e.g. backtest drcs --set depth=30 --rule "open short on cross down upper 1" --rule "close short on cross up upper 1".')
     },
     signal: (o, argv) => {
       const input = strategyInput(argv)
@@ -733,9 +786,9 @@ export function createBot(options = {}) {
       s.loaded.add(keyOf(market.symbol, market.interval.code))
       o.text(`Syncing ${market.symbol} ${market.interval.code}…`)
       extend(market, lastClosedOpen(market.interval.ms))
-      const report = { candle: candleJson(market.candles.at(-1)), insight: explain(market.candles, market.candles.length - 1, input.params) }
+      const report = { candle: candleJson(market.candles.at(-1)), insight: explain(market.candles, market.candles.length - 1, input.params, input.rules) }
       insightPanel(o, market, report)
-      o.text(`${describeParams(input.params)}; the next candle closes at ${F.hhmm(nextBoundary(market.interval.ms))} UTC.`)
+      o.text(`${describeParams(input.params, input.rules)}; the next candle closes at ${F.hhmm(nextBoundary(market.interval.ms))} UTC.`)
     },
     backtest: (o, argv) => {
       const input = strategyInput(argv, { '--balance': { alias: '-b', value: true }, '--from': { value: true }, '--to': { value: true } })
@@ -746,7 +799,7 @@ export function createBot(options = {}) {
       const initial = Number(input.opt.balance ?? 1000)
       const startAt = input.opt.from ? parseDate(input.opt.from) : market.candles[0].openTime
       const endAt = input.opt.to ? parseDate(input.opt.to) : now()
-      const report = backtestRun(market, input.params, initial, startAt, endAt)
+      const report = backtestRun(market, input.params, input.rules, initial, startAt, endAt)
       o.section(`Backtest: drcs on ${market.symbol} ${market.interval.code}`, (x) =>
         x.grid([
           ['Period', `${F.time(startAt)} → ${F.time(endAt)} UTC, ${F.count(report.evaluated)} candles`],
@@ -760,7 +813,7 @@ export function createBot(options = {}) {
           ['Computed in', F.elapsed(60 + rand() * 80)],
         ]),
       )
-      o.text(describeParams(input.params))
+      o.text(describeParams(input.params, input.rules))
     },
     'trading start': (o, argv) => {
       const input = strategyInput(argv)
@@ -768,11 +821,11 @@ export function createBot(options = {}) {
       const market = marketOrFail(input.symbol, input.interval)
       o.text(`Starting drcs on ${market.symbol} ${market.interval.code}…`)
       const key = keyOf(market.symbol, market.interval.code)
-      const session = { key, params: input.params, startedAt: now(), ticks: 0, trades: 0, lastTick: null, lastError: null, lastErrorAt: null, evaluated: -1, positions: [], nextTickAt: nextBoundary(market.interval.ms) }
+      const session = { key, params: input.params, rules: input.rules, startedAt: now(), ticks: 0, trades: 0, lastTick: null, lastError: null, lastErrorAt: null, evaluated: -1, positions: [], nextTickAt: nextBoundary(market.interval.ms) }
       const preview = tick(session, true)
       s.sessions.set(key, session)
       insightPanel(o, market, preview)
-      o.text(`✓ Trading ${market.symbol} ${market.interval.code} with drcs on cTrader DEMO (${describeParams(input.params)}).`)
+      o.text(`✓ Trading ${market.symbol} ${market.interval.code} with drcs on cTrader DEMO (${describeParams(input.params, input.rules)}).`)
       o.text(`  The newest candle was only previewed; the first trade can come at the next close, ${F.hhmm(session.nextTickAt)} UTC. Each tick prints a line here.`)
     },
     'trading stop': (o, argv) => {
@@ -844,7 +897,7 @@ export function createBot(options = {}) {
   const candleJson = (c) => ({ openTime: new Date(c.openTime).toISOString(), closeTime: new Date(c.closeTime).toISOString(), open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume })
   const snapshotLog = () => `/opt/beyondbot/logs/beyondbot-${new Date(startedAt).toISOString().slice(0, 10).replace(/-/g, '')}.log`
 
-  function backtestRun(market, p, initial, startAt, endAt) {
+  function backtestRun(market, p, rules, initial, startAt, endAt) {
     const cache = indicators(market.candles, p.depth)
     let balance = initial
     let peak = initial
@@ -854,11 +907,13 @@ export function createBot(options = {}) {
       if (c.openTime < startAt || c.closeTime > endAt) return
       if (WEEKEND.has(market.symbol) && isWeekend(c.closeTime)) return
       r.evaluated++
-      const { signal } = explain(market.candles, i, p, cache)
-      if (signal.action === 'Open') open.push({ quantity: (balance * signal.balanceShare) / c.close, price: c.close })
-      else if (signal.action === 'CloseNewest' && open.length) {
-        const position = open.pop()
-        const pnl = (c.close - position.price) * position.quantity
+      const { signal } = explain(market.candles, i, p, rules, cache)
+      // Backtesting/BacktestLedger.cs: a close closes the newest open position on its side.
+      const newest = signal.action === 'Close' ? open.findLastIndex((position) => position.side === signal.side) : -1
+      if (signal.action === 'Open') open.push({ quantity: (balance * signal.balanceShare) / c.close, price: c.close, side: signal.side })
+      else if (newest >= 0) {
+        const [position] = open.splice(newest, 1)
+        const pnl = (c.close - position.price) * position.quantity * (position.side === 'Buy' ? 1 : -1)
         const before = balance
         balance += pnl
         r.closed++
@@ -891,7 +946,8 @@ export function createBot(options = {}) {
     s.records.at(-1).price = position.price
     s.records.unshift({ orderId: '812301', symbol: 'XAUUSD', quantity: 2, price: round(xau.candles.at(-90).close, 2), status: 'None', type: 'Market', side: 'Buy', createdAt: xau.candles.at(-90).closeTime })
     if (options.trading !== false) {
-      const session = { key: 'XAUUSD 1h', params: params(), startedAt: now() - 5 * 3600e3 - 12 * 60e3, ticks: 5, trades: 1, lastTick: null, lastError: null, lastErrorAt: null, evaluated: -1, positions: [position.orderId], nextTickAt: nextBoundary(3600e3) }
+      const startParams = params()
+      const session = { key: 'XAUUSD 1h', params: startParams, rules: rulesOf([], startParams), startedAt: now() - 5 * 3600e3 - 12 * 60e3, ticks: 5, trades: 1, lastTick: null, lastError: null, lastErrorAt: null, evaluated: -1, positions: [position.orderId], nextTickAt: nextBoundary(3600e3) }
       tick(session, true)
       session.lastTick = { ...session.lastTick, outcome: 'Evaluated' }
       s.sessions.set('XAUUSD 1h', session)
@@ -914,7 +970,7 @@ COMMANDS:
     market         add, sync, list, remove
     candles        show, oldest
     indicators     show
-    strategies     The strategies the bot can run, with their parameters.
+    strategies     The strategies the bot can run, with their parameters and rules.
     signal         What a strategy decides on the newest candle, and why. Never trades.
     backtest       Replay a strategy over stored candles with a simulated account.
     trading        start, stop, status
