@@ -69,6 +69,8 @@ npm run lighthouse     # after a build: Lighthouse's mobile performance, at leas
 
 `npm run icons` and `npm run screenshots` regenerate the icons, splash screens and install screenshots in `pwa/public/`; `npm run record-fixtures` saves a real bot's answers (redacted) for the parser tests. The site's own tools (`bm check`, the sitemap, the search index, the axe audit) look only at the pages in the root, so the app has its own checks.
 
+**Strategy settings.** The Trading and Backtest forms are built entirely from the bot's catalog (`strategies --json`): each strategy's parameters with their ranges, its default rules, and the syntax of its rules, such as `open|close long|short on cross up|down lower|upper N`. Each word of that syntax becomes one control of a rule (a fixed word, a menu for `a|b`, a field for `N`), rules can be added, reordered and removed, and any rule can be written as text instead. So a new strategy on the bot, or a new kind of condition written the same way, needs no change in the app. The app checks ranges and rule syntax as you type; what depends on several values (a band beyond `moving-count`) is checked by the bot, whose message is shown. **Saved setups** keep a strategy, its parameters and its rules under a name, on the device, for any market. A bot from before rules (no `--json`) still works: its catalog is read from `strategies`, and no rules are sent. The code: `pwa/src/strategy/` (`rules.ts` the grammar, `config.ts` the settings and their checks, `setups.ts`), `pwa/src/components/StrategyForm.tsx` and `RuleEditor.tsx`.
+
 **Connecting a bot.** On the bot's server, allow the app's origin and restart the bot:
 
 ```sh

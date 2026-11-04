@@ -1,20 +1,74 @@
+import { z } from 'zod'
 import type { CommandResult, SectionBlock } from '../types.ts'
 import { findGrid, findSection, findTable, gridMap, parsed, rowsOf, sections, topLines, unreadable, type Parsed } from './blocks.ts'
 import { parseElapsed, parseMoney, parseNumber, parsePercent, parseTime } from './format.ts'
 
 export type StrategyParameter = { name: string; default: number; min: number; max: number; meaning: string; whole: boolean }
+/** The rules a strategy trades by when none are given, tried in order, and how its rules are written. */
+export type StrategyRules = { defaults: string[]; syntax: string }
 export type StrategyDefinition = {
   name: string
   title: string
   description: string
   defaultMarket: { symbol: string; interval: string } | null
   parameters: StrategyParameter[]
+  /** Null for a bot from before rules (it has no --json catalog): the app then sends none. */
+  rules: StrategyRules | null
+}
+
+/** `strategies --json` (Cli/Rendering/StrategyCatalogJson.cs), camelCase. */
+const catalogJson = z.array(
+  z.object({
+    name: z.string().min(1),
+    title: z.string(),
+    description: z.string(),
+    symbol: z.string().nullish(),
+    interval: z.string().nullish(),
+    parameters: z.array(
+      z.object({
+        name: z.string().min(1),
+        description: z.string().nullish(),
+        default: z.number(),
+        minimum: z.number(),
+        maximum: z.number(),
+        wholeNumber: z.boolean().nullish(),
+      }),
+    ),
+    rules: z.object({ defaults: z.array(z.string()), syntax: z.string() }).nullish(),
+  }),
+)
+
+/**
+ * The strategy catalog. A bot with rules answers `strategies --json`, which says everything a form needs; an
+ * older bot (no --json) prints panels, read by {@link parseStrategies}. Nothing here knows any strategy.
+ */
+export function parseStrategyCatalog(result: CommandResult): Parsed<StrategyDefinition[]> {
+  if (result.json == null) return parseStrategies(result)
+  const read = catalogJson.safeParse(result.json)
+  if (!read.success) return unreadable(`Unreadable strategy catalog: ${read.error.issues[0]?.message ?? 'unexpected shape'}.`)
+  return parsed(
+    read.data.map((strategy) => ({
+      name: strategy.name,
+      title: strategy.title,
+      description: strategy.description,
+      defaultMarket: strategy.symbol && strategy.interval ? { symbol: strategy.symbol, interval: strategy.interval } : null,
+      parameters: strategy.parameters.map((p) => ({
+        name: p.name,
+        default: p.default,
+        min: p.minimum,
+        max: p.maximum,
+        meaning: p.description ?? '',
+        whole: p.wholeNumber ?? [p.default, p.minimum, p.maximum].every(Number.isInteger),
+      })),
+      rules: strategy.rules ? { defaults: strategy.rules.defaults, syntax: strategy.rules.syntax } : null,
+    })),
+  )
 }
 
 /**
- * `strategies`: one panel per strategy titled "drcs – Double Red Cross" (en dash), holding the description,
- * "Default market: XAUUSD 1h" and a Parameter / Default / Range / Meaning table, the range written "1–500".
- * The bot does not print whether a parameter is a whole number; integer bounds and default mean it is.
+ * `strategies` of a bot without rules: one panel per strategy titled "drcs – Double Red Cross" (en dash), holding
+ * the description, "Default market: XAUUSD 1h" and a Parameter / Default / Range / Meaning table, the range written
+ * "1–500". The bot does not print whether a parameter is a whole number; integer bounds and default mean it is.
  */
 export function parseStrategies(result: CommandResult): Parsed<StrategyDefinition[]> {
   const panels = sections(result.blocks, (title) => / [–-] /.test(title))
@@ -42,6 +96,7 @@ export function parseStrategies(result: CommandResult): Parsed<StrategyDefinitio
       description: text.filter((line) => line !== marketLine).join(' '),
       defaultMarket: market ? { symbol: market[1] ?? '', interval: market[2] ?? '' } : null,
       parameters,
+      rules: null,
     })
   }
   return parsed(definitions)
@@ -61,21 +116,39 @@ export type SignalReading = {
   reason: string
   /** "depth=23 deviation=1 …" */
   parameters: string | null
+  /** The rules it decided by, in order (a bot without rules: none). */
+  rules: string[]
   /** "HH:mm" of the next candle close, UTC. */
   nextClose: string | null
 }
 
-/** "open buy (50 % of balance)" (the space before % depends on the server's culture), "close newest position", "none". */
+const SIDES: Record<string, 'buy' | 'sell'> = { long: 'buy', buy: 'buy', short: 'sell', sell: 'sell' }
+
+/**
+ * "open long (50 % of balance)" (the space before % depends on the server's culture), "close long", "none". A bot
+ * without rules wrote "open buy (…)" and "close newest position".
+ */
 export function readSignal(text: string): Pick<SignalReading, 'action' | 'side' | 'share'> {
-  const open = /^open (buy|sell) \((\d+(?:\.\d+)?)\s?% of balance\)$/i.exec(text.trim())
-  if (open) return { action: 'open', side: open[1]!.toLowerCase() as 'buy' | 'sell', share: Number(open[2]) }
+  const open = /^open (long|short|buy|sell) \((\d+(?:\.\d+)?)\s?% of balance\)$/i.exec(text.trim())
+  if (open) return { action: 'open', side: SIDES[open[1]!.toLowerCase()] ?? null, share: Number(open[2]) }
+  const close = /^close (long|short)$/i.exec(text.trim())
+  if (close) return { action: 'close', side: SIDES[close[1]!.toLowerCase()] ?? null, share: null }
   if (/^close newest position$/i.test(text.trim())) return { action: 'close', side: null, share: null }
   return { action: 'none', side: null, share: null }
 }
 
+/** "depth=23 deviation=1 moving-count=2, rules: open long on …; close long on …": the parameters, and the rules. */
+export function readStrategyLine(line: string | null): { parameters: string | null; rules: string[] } {
+  if (!line) return { parameters: null, rules: [] }
+  const at = line.indexOf(', rules: ')
+  if (at < 0) return { parameters: line, rules: [] }
+  const rules = line.slice(at + ', rules: '.length).split(';').map((rule) => rule.trim()).filter(Boolean)
+  return { parameters: line.slice(0, at), rules }
+}
+
 const ON_MARKET = /^(\S+) on (\S+ \S+)$/
 
-function readInsight(panel: SectionBlock): Omit<SignalReading, 'parameters' | 'nextClose'> | null {
+function readInsight(panel: SectionBlock): Omit<SignalReading, 'parameters' | 'rules' | 'nextClose'> | null {
   const grid = findGrid(panel.blocks)
   const title = ON_MARKET.exec(panel.title)
   if (!grid || !title) return null
@@ -105,7 +178,7 @@ export function parseSignal(result: CommandResult): Parsed<SignalReading> {
   if (!insight) return unreadable('No decision panel in the answer.')
   const tail = topLines(result.blocks).find((line) => /the next candle closes at/.test(line)) ?? null
   const tailMatch = tail ? /^(.*); the next candle closes at (\d{2}:\d{2}) UTC\.?$/.exec(tail) : null
-  return parsed({ ...insight, parameters: tailMatch?.[1] ?? null, nextClose: tailMatch?.[2] ?? null })
+  return parsed({ ...insight, ...readStrategyLine(tailMatch?.[1] ?? null), nextClose: tailMatch?.[2] ?? null })
 }
 
 export type BacktestReport = {
@@ -130,6 +203,7 @@ export type BacktestReport = {
   stillOpen: number
   computedMs: number | null
   parameters: string | null
+  rules: string[]
 }
 
 /**
@@ -154,7 +228,7 @@ export function parseBacktest(result: CommandResult): Parsed<BacktestReport> {
   const initial = balance[0]
   const final = balance[1]
   if (initial == null || final == null) return unreadable('Unreadable balance line in the backtest report.')
-  const parameters = topLines(result.blocks).find((line) => /^[\w-]+=\S+( [\w-]+=\S+)*$/.test(line)) ?? null
+  const strategyLine = topLines(result.blocks).find((line) => /^[\w-]+=\S+( [\w-]+=\S+)*(, rules: .+)?$/.test(line)) ?? null
 
   return parsed({
     strategy: title[1] ?? '',
@@ -177,11 +251,11 @@ export function parseBacktest(result: CommandResult): Parsed<BacktestReport> {
     maxDrawdownPercent: parsePercent(drawdown?.[2]),
     stillOpen: open ? Number(open[1]) : 0,
     computedMs: parseElapsed(map.get('Computed in')),
-    parameters,
+    ...readStrategyLine(strategyLine),
   })
 }
 
-/** Parameters echoed as "depth=23 deviation=1 moving-count=2 trigger=1". */
+/** Parameters echoed as "depth=23 deviation=1 moving-count=2" (the part before ", rules:"). */
 export function readParameterLine(line: string | null): Record<string, number> {
   const values: Record<string, number> = {}
   for (const part of (line ?? '').split(/\s+/)) {

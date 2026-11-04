@@ -13,6 +13,8 @@ export type StrategyInput = {
   /** Interval code, e.g. "1h". */
   interval: string
   params: Record<string, number>
+  /** The rules, in the order they are tried; none means the strategy's defaults. */
+  rules?: string[]
 }
 
 /** Invariant decimal without grouping or exponent: what `decimal.TryParse(…, InvariantCulture)` reads. */
@@ -28,13 +30,14 @@ export function utcArg(value: Date | number | string): string {
   return date.toISOString().slice(0, 19)
 }
 
-const strategyArgs = ({ strategy, symbol, interval, params }: StrategyInput) => [
+const strategyArgs = ({ strategy, symbol, interval, params, rules = [] }: StrategyInput) => [
   strategy,
   '--symbol',
   symbol,
   '--interval',
   interval,
   ...Object.entries(params).flatMap(([name, value]) => ['--set', `${name}=${plainNumber(value)}`]),
+  ...rules.flatMap((rule) => ['--rule', rule]),
   '-d',
 ]
 
@@ -85,7 +88,9 @@ export const cmd = {
     ...(last ? ['--last', String(last)] : []),
   ],
 
-  strategies: () => ['strategies'],
+  strategies: () => ['strategies', '--json'],
+  /** The catalog of a bot from before rules, which has no --json. */
+  strategiesText: () => ['strategies'],
   signal: (input: StrategyInput) => ['signal', ...strategyArgs(input)],
   backtest: (input: StrategyInput, { balance, from, to }: { balance?: number; from?: Date | number | null; to?: Date | number | null } = {}) => [
     'backtest',

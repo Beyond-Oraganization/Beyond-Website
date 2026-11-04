@@ -90,13 +90,22 @@ export const queryKey = (connectionId: string | undefined, name: string, args: s
 /**
  * A read from the bot, cached per bot. The answer is read with `parse`; when that fails the screen shows the
  * answer as the bot printed it. `accept` lists exit codes that still carry a usable answer (status exits 1
- * when the database is down). `persist` keeps the last answer on the device for starting offline.
+ * when the database is down). `persist` keeps the last answer on the device for starting offline. `fallback` runs
+ * other arguments when the first answer says so (an older bot that does not know an option).
  */
 export function useCommand<T>(
   name: string,
   args: string[] | null,
   parse: (result: CommandResult) => Parsed<T>,
-  options: { priority?: Priority; refetchInterval?: number | false; enabled?: boolean; accept?: number[]; persist?: boolean; staleTime?: number } = {},
+  options: {
+    priority?: Priority
+    refetchInterval?: number | false
+    enabled?: boolean
+    accept?: number[]
+    persist?: boolean
+    staleTime?: number
+    fallback?: { args: string[]; when: (outcome: Outcome) => boolean }
+  } = {},
 ) {
   const { connection, queue, ready } = useBot()
   return useQuery<CommandData<T>, CommandFailure>({
@@ -105,7 +114,8 @@ export function useCommand<T>(
     refetchInterval: options.refetchInterval,
     staleTime: options.staleTime ?? 2000,
     queryFn: async ({ signal }) => {
-      const outcome = await queue!.run(args!, { priority: options.priority ?? 'view', signal })
+      let outcome = await queue!.run(args!, { priority: options.priority ?? 'view', signal })
+      if (options.fallback?.when(outcome)) outcome = await queue!.run(options.fallback.args, { priority: options.priority ?? 'view', signal })
       if (!ok(outcome, options.accept ?? [])) throw new CommandFailure(outcome)
       const data: CommandData<T> = { result: outcome.result, parsed: parse(outcome.result), at: Date.now(), roundTripMs: outcome.roundTripMs }
       if (options.persist && connection) void db.set(`cache:${connection.id}:${name}`, { key: queryKey(connection.id, name, args!), data })

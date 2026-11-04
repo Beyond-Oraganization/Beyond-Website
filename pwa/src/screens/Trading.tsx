@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { useAction, useBot } from '../api/bot.ts'
 import { CommandFailure } from '../api/client.ts'
@@ -12,7 +12,8 @@ import { Answer, FailurePanel } from '../components/Answer.tsx'
 import { Decision } from '../components/Decision.tsx'
 import { ScreenHead } from '../components/ScreenHead.tsx'
 import { ConfirmSheet } from '../components/Sheet.tsx'
-import { StrategyForm, initialDraft, toInput, validateDraft, type StrategyDraft } from '../components/StrategyForm.tsx'
+import { StrategyForm } from '../components/StrategyForm.tsx'
+import { describeParams, initialConfig, toInput, validateConfig, type StrategyConfig } from '../strategy/config.ts'
 import { toast } from '../components/Toasts.tsx'
 import { Button, Callout, EmptyState, Pill, Section, Skeleton } from '../components/ui.tsx'
 import { fmtClock, fmtDuration, fmtElapsed, fmtHourMinute, fmtNumber, fmtPrice, fmtRelative } from '../format.ts'
@@ -20,7 +21,7 @@ import { useNow } from '../hooks/env.ts'
 import { useMarkets, useStrategies } from '../hooks/data.ts'
 import { clockOffset, useSessionData } from '../hooks/session.ts'
 import { type TickEntry, useLogs, useTicks } from '../state/logs.ts'
-import { lastSignalWords, outcomeWords, plural } from '../words.ts'
+import { lastSignalWords, levelsOf, outcomeWords, plural } from '../words.ts'
 
 function SessionCard({ session, offset, onStop }: { session: TradingSessionState; offset: number; onStop: () => void }) {
   const now = useNow(1000) + offset
@@ -52,6 +53,13 @@ function SessionCard({ session, offset, onStop }: { session: TradingSessionState
           </Pill>
         ))}
       </div>
+      {session.rules?.length ? (
+        <ol className="rule-list mono" aria-label={`Rules of ${marketLabel(session.market)}, tried in order`}>
+          {session.rules.map((rule, index) => (
+            <li key={index}>{rule}</li>
+          ))}
+        </ol>
+      ) : null}
       <dl className="dl">
         <dt>Next tick</dt>
         <dd>{next ? `${fmtClock(next)} UTC (${fmtRelative(next, now)})` : '–'}</dd>
@@ -72,7 +80,7 @@ function SessionCard({ session, offset, onStop }: { session: TradingSessionState
             <dt>Last candle</dt>
             <dd>
               close {fmtPrice(tick.candle.close)}
-              {tick.insight?.values.find((v) => v.name === 'band') ? ` · band ${fmtPrice(tick.insight.values.find((v) => v.name === 'band')!.value)}` : ''}
+              {levelsOf(tick.insight?.values).map((level) => ` · ${level.name} ${fmtPrice(level.value)}`)}
             </dd>
           </>
         ) : null}
@@ -96,13 +104,12 @@ function TickLine({ entry }: { entry: TickEntry }) {
       </li>
     )
   const tick = entry.tick
-  const band = tick.insight?.values.find((v) => v.name === 'band')
   const parts = [
     tick.candle ? `close ${fmtPrice(tick.candle.close)}` : null,
-    band ? `band ${fmtPrice(band.value)}` : null,
+    ...levelsOf(tick.insight?.values).map((level) => `${level.name} ${fmtPrice(level.value)}`),
     tick.outcome === 'Evaluated' || tick.outcome === 'Preview' ? `+${tick.candlesAdded} candle${tick.candlesAdded === 1 ? '' : 's'}` : null,
     tick.insight ? `${tick.outcome === 'Preview' ? 'preview: ' : 'signal '}${lastSignalWords(tick)}` : outcomeWords(tick.outcome),
-    tick.trade ? (tick.trade.action === 'Opened' ? `opened ${tick.trade.order.side.toLowerCase()} ${fmtNumber(tick.trade.order.quantity)} @ ${fmtPrice(tick.trade.order.price)}` : `closed position ${tick.trade.order.orderId}`) : null,
+    tick.trade ? (tick.trade.action === 'Opened' ? `opened ${tick.trade.order.side === 'Sell' ? 'short' : 'long'} ${fmtNumber(tick.trade.order.quantity)} @ ${fmtPrice(tick.trade.order.price)}` : `closed position ${tick.trade.order.orderId}`) : null,
     tick.error ? `tick failed: ${tick.error}` : null,
     fmtElapsed((parseTimeSpan(tick.elapsed) ?? 0) * 1000),
     `next ${fmtHourMinute(parseIso(tick.nextTickAt))}`,
@@ -122,7 +129,7 @@ function StartForm({ running }: { running: TradingSessionState[] }) {
   const markets = useMarkets()
   const run = useAction()
   const [params] = useSearchParams()
-  const [edited, setDraft] = useState<StrategyDraft | null>(null)
+  const [edited, setDraft] = useState<StrategyConfig | null>(null)
   const [touched, setTouched] = useState(false)
   const [preview, setPreview] = useState<SignalReading | null>(null)
   const [failure, setFailure] = useState<{ message: string; hint: string | null } | null>(null)
@@ -132,10 +139,10 @@ function StartForm({ running }: { running: TradingSessionState[] }) {
   const marketRows = markets.data?.parsed.ok ? markets.data.parsed.value : null
 
   const [symbol, interval] = (params.get('start') ?? '').split(' ')
-  const draft = edited ?? (definitions && marketRows ? initialDraft(definitions, marketRows, { symbol, interval }) : null)
+  const draft = edited ?? (definitions && marketRows ? initialConfig(definitions, marketRows, { symbol, interval, strategy: params.get('strategy') }) : null)
 
   const definition = definitions?.find((d) => d.name === draft?.strategy)
-  const errors = useMemo(() => (draft ? validateDraft(draft, definition) : {}), [draft, definition])
+  const errors = useMemo(() => (draft ? validateConfig(draft, definition) : {}), [draft, definition])
   const valid = Object.keys(errors).length === 0
   const replacing = draft ? running.some((s) => marketLabel(s.market) === draft.market) : false
 
@@ -148,7 +155,7 @@ function StartForm({ running }: { running: TradingSessionState[] }) {
     setPreviewing(true)
     setFailure(null)
     try {
-      const reading = parseSignal(await run(cmd.signal(toInput(draft))))
+      const reading = parseSignal(await run(cmd.signal(toInput(draft, definition))))
       setPreview(reading.ok ? reading.value : null)
     } catch (error) {
       setFailure(error instanceof CommandFailure ? { message: error.message, hint: error.hint } : { message: String(error), hint: null })
@@ -157,7 +164,7 @@ function StartForm({ running }: { running: TradingSessionState[] }) {
     }
   }
 
-  const input = toInput(draft)
+  const input = toInput(draft, definition)
   return (
     <form
       className="stack"
@@ -168,7 +175,7 @@ function StartForm({ running }: { running: TradingSessionState[] }) {
         if (valid) setConfirming(true)
       }}
     >
-      <StrategyForm definitions={definitions} markets={marketRows} draft={draft} onChange={(next) => {
+      <StrategyForm definitions={definitions} markets={marketRows} config={draft} onChange={(next) => {
         setDraft(next)
         setPreview(null)
       }} errors={touched ? errors : {}} />
@@ -195,7 +202,8 @@ function StartForm({ running }: { running: TradingSessionState[] }) {
         review={[
           ['Strategy', `${definition?.name} – ${definition?.title}`],
           ['Market', draft.market],
-          ['Parameters', Object.entries(input.params).map(([k, v]) => `${k}=${v}`).join(' ')],
+          ['Parameters', describeParams(input)],
+          ...(input.rules?.length ? [['Rules, in order', <ol key="rules" className="rule-list mono">{input.rules.map((rule, index) => <li key={index}>{rule}</li>)}</ol>] as [string, ReactNode]] : []),
           ...(replacing ? [['Replaces', 'the session trading this market now'] as [string, string]] : []),
         ]}
         confirmLabel={replacing ? 'Replace and start' : 'Start trading'}

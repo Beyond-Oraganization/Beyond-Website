@@ -1,13 +1,13 @@
 import { afterAll, describe, expect, it } from 'vitest'
 import { createBot } from '../../../mock-bot/bot.mjs'
-import { realBacktest, realMarketList, realStrategies } from '../fixtures/real.ts'
+import { legacyStrategies, realBacktest, realMarketList, realStrategiesJson } from '../fixtures/real.ts'
 import type { CommandResult } from '../types.ts'
 import { parseSession } from '../session.ts'
 import { notices } from './blocks.ts'
 import { parseCandles, parseIndicators, parseMarketList, parseMarketSync, parseOldestCandle } from './markets.ts'
 import { parseOrders, readFill } from './orders.ts'
 import { parseStatus } from './status.ts'
-import { parseBacktest, parseSignal, parseStrategies, readParameterLine, readSignal } from './strategies.ts'
+import { parseBacktest, parseSignal, parseStrategyCatalog, readParameterLine, readSignal, readStrategyLine } from './strategies.ts'
 
 const bot = createBot({ ticking: false, addDelayMs: 0, start: Date.UTC(2026, 10, 4, 10, 15) })
 afterAll(() => bot.stop())
@@ -40,13 +40,39 @@ describe('the bot’s own approved outputs', () => {
       maxDrawdownPercent: -2.8,
       stillOpen: 0,
       computedMs: 87,
-      parameters: 'depth=23 deviation=1 moving-count=2 trigger=1',
+      parameters: 'depth=23 deviation=1 moving-count=2',
+      rules: ['open long on cross up lower 1', 'close long on cross down lower 1'],
     })
-    expect(readParameterLine('depth=23 deviation=1 moving-count=2 trigger=1')).toEqual({ depth: 23, deviation: 1, 'moving-count': 2, trigger: 1 })
+    expect(readParameterLine('depth=23 deviation=1 moving-count=2')).toEqual({ depth: 23, deviation: 1, 'moving-count': 2 })
   })
 
-  it('reads the strategy catalog (Strategies_PrintsTheCatalog.txt)', () => {
-    const catalog = parseStrategies(realStrategies)
+  it('splits the strategy line into parameters and rules, with or without rules', () => {
+    expect(readStrategyLine('depth=30 deviation=1 moving-count=2, rules: open short on cross down upper 1')).toEqual({ parameters: 'depth=30 deviation=1 moving-count=2', rules: ['open short on cross down upper 1'] })
+    expect(readStrategyLine('depth=23 deviation=1 moving-count=2 trigger=1')).toEqual({ parameters: 'depth=23 deviation=1 moving-count=2 trigger=1', rules: [] })
+    expect(readStrategyLine(null)).toEqual({ parameters: null, rules: [] })
+  })
+
+  it('reads the strategy catalog from strategies --json', () => {
+    const catalog = parseStrategyCatalog(realStrategiesJson)
+    expect(catalog.ok).toBe(true)
+    if (!catalog.ok) return
+    const [drcs] = catalog.value
+    expect(drcs).toMatchObject({ name: 'drcs', title: 'Double Red Cross', defaultMarket: { symbol: 'XAUUSD', interval: '1h' } })
+    expect(drcs?.parameters).toEqual([
+      { name: 'depth', default: 23, min: 1, max: 500, meaning: 'Lookback of the EMA and ATR the envelope is built from', whole: true },
+      { name: 'deviation', default: 1, min: 1, max: 20, meaning: 'ATR multiplier between neighbouring bands', whole: true },
+      { name: 'moving-count', default: 2, min: 1, max: 10, meaning: 'Number of bands on each side of the center', whole: true },
+    ])
+    expect(drcs?.rules).toEqual({ defaults: ['open long on cross up lower 1', 'close long on cross down lower 1'], syntax: 'open|close long|short on cross up|down lower|upper N' })
+  })
+
+  it('says why a catalog of the wrong shape cannot be read, instead of guessing', () => {
+    expect(parseStrategyCatalog({ ...realStrategiesJson, json: [{ name: 'x' }] }).ok).toBe(false)
+    expect(parseStrategyCatalog({ ...realStrategiesJson, json: { strategies: [] } }).ok).toBe(false)
+  })
+
+  it('reads the catalog of a bot from before rules (no --json), which then has no rules', () => {
+    const catalog = parseStrategyCatalog(legacyStrategies)
     expect(catalog.ok).toBe(true)
     if (!catalog.ok) return
     const [drcs] = catalog.value
@@ -58,6 +84,7 @@ describe('the bot’s own approved outputs', () => {
       { name: 'moving-count', default: 2, min: 1, max: 10, meaning: 'Number of bands on each side of the center', whole: true },
       { name: 'trigger', default: 1, min: 1, max: 10, meaning: 'Which lower band (1 = nearest the center) triggers signals', whole: true },
     ])
+    expect(drcs?.rules).toBeNull()
   })
 
   it('reads the market table, with "none" and "–" cells', () => {
@@ -69,11 +96,17 @@ describe('the bot’s own approved outputs', () => {
     ])
   })
 
-  it('reads a signal in either culture', () => {
-    expect(readSignal('open buy (50 % of balance)')).toEqual({ action: 'open', side: 'buy', share: 50 })
-    expect(readSignal('open buy (50% of balance)')).toEqual({ action: 'open', side: 'buy', share: 50 })
-    expect(readSignal('close newest position')).toEqual({ action: 'close', side: null, share: null })
+  it('reads a signal in either culture, long or short', () => {
+    expect(readSignal('open long (50 % of balance)')).toEqual({ action: 'open', side: 'buy', share: 50 })
+    expect(readSignal('open short (50% of balance)')).toEqual({ action: 'open', side: 'sell', share: 50 })
+    expect(readSignal('close long')).toEqual({ action: 'close', side: 'buy', share: null })
+    expect(readSignal('close short')).toEqual({ action: 'close', side: 'sell', share: null })
     expect(readSignal('none').action).toBe('none')
+  })
+
+  it('still reads the signals of a bot from before rules', () => {
+    expect(readSignal('open buy (50 % of balance)')).toEqual({ action: 'open', side: 'buy', share: 50 })
+    expect(readSignal('close newest position')).toEqual({ action: 'close', side: null, share: null })
   })
 })
 
@@ -109,13 +142,21 @@ describe('answers from the mock bot', () => {
     expect(oldest.ok && oldest.value.broker).toBe('cTrader')
   })
 
-  it('signal and backtest', async () => {
+  it('strategies --json, signal and backtest, with the default rules and with others', async () => {
+    const catalog = parseStrategyCatalog(await run('strategies', '--json'))
+    expect(catalog.ok && catalog.value[0]?.rules?.syntax).toBe('open|close long|short on cross up|down lower|upper N')
     const signal = parseSignal(await run('signal', 'drcs', '--symbol', 'XAUUSD', '--interval', '1h', '-d'))
-    expect(signal.ok && signal.value).toMatchObject({ strategy: 'drcs', market: 'XAUUSD 1h', parameters: 'depth=23 deviation=1 moving-count=2 trigger=1' })
-    expect(signal.ok && signal.value.values.map((v) => v.name)).toEqual(['open', 'close', 'EMA(23)', 'ATR(23)', 'band'])
-    const report = parseBacktest(await run('backtest', 'drcs', '--symbol', 'XAUUSD', '--interval', '1h', '--set', 'depth=30', '-d', '--balance', '5000'))
+    expect(signal.ok && signal.value).toMatchObject({ strategy: 'drcs', market: 'XAUUSD 1h', parameters: 'depth=23 deviation=1 moving-count=2', rules: ['open long on cross up lower 1', 'close long on cross down lower 1'] })
+    expect(signal.ok && signal.value.values.map((v) => v.name)).toEqual(['open', 'close', 'EMA(23)', 'ATR(23)', 'lower 1'])
+    const report = parseBacktest(await run('backtest', 'drcs', '--symbol', 'XAUUSD', '--interval', '1h', '--set', 'depth=30', '--rule', 'open short on cross down upper 2', '--rule', 'close short on cross up upper 2', '-d', '--balance', '5000'))
     expect(report.ok && report.value.initialBalance).toBe(5000)
-    expect(report.ok && report.value.parameters).toBe('depth=30 deviation=1 moving-count=2 trigger=1')
+    expect(report.ok && report.value).toMatchObject({ parameters: 'depth=30 deviation=1 moving-count=2', rules: ['open short on cross down upper 2', 'close short on cross up upper 2'] })
+  })
+
+  it('a rule the strategy cannot have fails with the bot’s message', async () => {
+    const failed = await run('backtest', 'drcs', '-d', '--rule', 'open long on cross up lower 3')
+    expect(failed.exitCode).toBe(1)
+    expect(failed.error?.message).toBe("Rule 'open long on cross up lower 3': lower 3 is not a band of the envelope: it has bands 1 to 2 on each side.")
   })
 
   it('orders and actions', async () => {
@@ -142,7 +183,7 @@ const recorded = Object.entries(import.meta.glob<Recorded>('../fixtures/recorded
 const PARSERS: [RegExp, (result: CommandResult) => { ok: boolean }][] = [
   [/^status$/, parseStatus],
   [/^market list$/, parseMarketList],
-  [/^strategies$/, parseStrategies],
+  [/^strategies( --json)?$/, parseStrategyCatalog],
   [/^session --json$/, parseSession],
   [/^orders list/, parseOrders],
   [/^candles show /, parseCandles],

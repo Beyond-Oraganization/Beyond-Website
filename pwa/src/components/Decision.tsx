@@ -30,6 +30,13 @@ export function Decision({ reading, title }: { reading: SignalReading; title?: s
           </>
         ) : null}
       </dl>
+      {reading.rules.length ? (
+        <ol className="rule-list mono" aria-label="Rules, tried in order">
+          {reading.rules.map((rule, index) => (
+            <li key={index}>{rule}</li>
+          ))}
+        </ol>
+      ) : null}
       {reading.parameters ? <p className="foot">{reading.parameters}</p> : null}
     </div>
   )

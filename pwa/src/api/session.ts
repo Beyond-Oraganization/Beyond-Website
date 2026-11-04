@@ -12,7 +12,7 @@ const str = z.string()
 const strOrNull = z.string().nullable()
 const market = z.object({ symbol: str, interval: str })
 const signal = z.object({ action: str, side: str, balanceShare: num })
-const insight = z.object({ signal, reason: str, values: z.array(z.object({ name: str, value: num })) })
+const insight = z.object({ signal, reason: str, values: z.array(z.object({ name: str, value: num, isLevel: z.boolean().optional() })) })
 const candle = z.object({ openTime: str, closeTime: str, open: num, high: num, low: num, close: num, volume: num })
 const order = z.object({ orderId: str, symbol: str, quantity: num, price: num, status: str, type: str, side: str, createdAt: str })
 
@@ -81,6 +81,7 @@ export const SessionSchema = z.object({
       market,
       strategy: str,
       parameters: z.record(z.string(), num),
+      rules: z.array(str).optional(),
       startedAt: str,
       ticks: num,
       trades: num,

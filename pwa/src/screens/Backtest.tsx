@@ -9,7 +9,8 @@ import { Chart } from '../components/Chart.tsx'
 import { DataTable } from '../components/DataTable.tsx'
 import { describedBy, Field } from '../components/Field.tsx'
 import { ScreenHead } from '../components/ScreenHead.tsx'
-import { StrategyForm, initialDraft, toInput, validateDraft, type StrategyDraft } from '../components/StrategyForm.tsx'
+import { StrategyForm } from '../components/StrategyForm.tsx'
+import { applySetup, configFromInput, initialConfig, toInput, validateConfig, type StrategyConfig } from '../strategy/config.ts'
 import { toast } from '../components/Toasts.tsx'
 import { Button, Callout, EmptyState, Section, Skeleton, StatTile } from '../components/ui.tsx'
 import { arrow, fmtCount, fmtElapsed, fmtMoney, fmtPercent, fmtSignedMoney, fmtSignedPercent, fmtTime, tone } from '../format.ts'
@@ -39,6 +40,21 @@ function Report({ report }: { report: BacktestReport }) {
   )
 }
 
+/** The rules a run traded by, in the order they were tried (saved runs from before rules have none). */
+function RulesUsed({ rules }: { rules: string[] | undefined }) {
+  if (!rules?.length) return null
+  return (
+    <div className="stack-sm">
+      <p className="label mute">Rules, tried in order</p>
+      <ol className="rule-list mono">
+        {rules.map((rule, index) => (
+          <li key={index}>{rule}</li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
 export default function Backtest() {
   const strategies = useStrategies()
   const markets = useMarkets()
@@ -46,7 +62,7 @@ export default function Backtest() {
   const { connection } = useBot()
   const [params] = useSearchParams()
   const samples = useSettings((state) => state.equitySamples)
-  const [edited, setDraft] = useState<StrategyDraft | null>(null)
+  const [edited, setDraft] = useState<StrategyConfig | null>(null)
   const [balance, setBalance] = useState('1000')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
@@ -63,14 +79,14 @@ export default function Backtest() {
   const definitions = strategies.data?.parsed.ok ? strategies.data.parsed.value : null
   const rows = markets.data?.parsed.ok ? markets.data.parsed.value : null
   const [symbol, interval] = (params.get('market') ?? '').split(' ')
-  const draft = edited ?? (definitions && rows ? initialDraft(definitions, rows, { symbol, interval }) : null)
+  const draft = edited ?? (definitions && rows ? initialConfig(definitions, rows, { symbol, interval, strategy: params.get('strategy') }) : null)
   useEffect(() => {
     if (connection) void db.get<SavedRun[]>(`backtests:${connection.id}`).then((list) => setSaved(list ?? []))
   }, [connection])
 
   const definition = definitions?.find((d) => d.name === draft?.strategy)
   const errors = useMemo(() => {
-    const found = draft ? validateDraft(draft, definition) : {}
+    const found = draft ? validateConfig(draft, definition) : {}
     if (!(Number(balance) > 0)) found.balance = 'The starting balance must be above 0.'
     if (from && to && from >= to) found.to = 'The end must be after the start.'
     return found
@@ -88,7 +104,7 @@ export default function Backtest() {
     setBusy(true)
     setFailure(null)
     try {
-      const input = toInput(draft)
+      const input = toInput(draft, definition)
       const answer = await run(cmd.backtest(input, { balance: Number(balance), from: dateOrNull(from), to: dateOrNull(to) }), { invalidate: [] })
       const report = parseBacktest(answer)
       if (!report.ok) throw new Error(report.reason)
@@ -148,7 +164,7 @@ export default function Backtest() {
               void start()
             }}
           >
-            <StrategyForm definitions={definitions} markets={rows} draft={draft} onChange={setDraft} errors={touched ? errors : {}} />
+            <StrategyForm definitions={definitions} markets={rows} config={draft} onChange={setDraft} errors={touched ? errors : {}} />
             <div className="form-grid">
               <Field id={ids.balance} label="Starting balance" error={touched ? errors.balance : undefined} hint="Simulated; no currency.">
                 <input id={ids.balance} className="mono" type="number" min="1" step="any" inputMode="decimal" value={balance} onChange={(event) => setBalance(event.target.value)} aria-describedby={describedBy(ids.balance, 'hint', touched ? errors.balance : null)} />
@@ -183,6 +199,7 @@ export default function Backtest() {
           </div>
           <div className="stack">
             <Report report={current.report} />
+            <RulesUsed rules={current.report.rules} />
             <div className="stack-sm">
               <h3 className="h3">Balance over time</h3>
               {current.curve ? (
@@ -238,6 +255,7 @@ export default function Backtest() {
                 { key: 'market', header: 'Market', card: 'title', render: (run) => run.report.market },
                 { key: 'pl', header: 'Profit / loss', card: 'sub', align: 'right', render: (run) => <span className={tone(run.report.profitLoss) ?? undefined}>{fmtSignedPercent(run.report.returnPercent)}</span> },
                 { key: 'params', header: 'Parameters', wrap: true, render: (run) => run.report.parameters ?? '' },
+                { key: 'rules', header: 'Rules', wrap: true, render: (run) => (run.report.rules ?? []).join('; ') },
                 { key: 'trades', header: 'Trades', align: 'right', render: (run) => run.report.trades },
                 { key: 'dd', header: 'Max drawdown', align: 'right', render: (run) => fmtPercent(run.report.maxDrawdownPercent) },
                 { key: 'when', header: 'Run', render: (run) => fmtTime(run.at) },
@@ -246,6 +264,16 @@ export default function Backtest() {
                 <span className="row">
                   <Button compact variant="ghost" onClick={() => setCurrent(run)}>
                     Show
+                  </Button>
+                  <Button compact variant="ghost" onClick={() => {
+                    // Fitted to the catalog as it is now: a run from before rules had parameters that may be gone.
+                    const used = configFromInput(run.input)
+                    const known = definitions?.find((d) => d.name === used.strategy)
+                    setDraft(known ? applySetup(used, used, known).config : used)
+                    setTouched(true)
+                    window.scrollTo({ top: 0 })
+                  }}>
+                    Use
                   </Button>
                   <label className="check small">
                     <input
@@ -265,6 +293,7 @@ export default function Backtest() {
                 rows={[
                   ['Market', (r: SavedRun) => r.report.market],
                   ['Parameters', (r: SavedRun) => r.report.parameters ?? ''],
+                  ['Rules', (r: SavedRun) => (r.report.rules ?? []).join('; ')],
                   ['Period', (r: SavedRun) => `${fmtTime(r.report.start)} → ${fmtTime(r.report.end)}`],
                   ['Profit / loss', (r: SavedRun) => `${fmtSignedMoney(r.report.profitLoss)} ${fmtSignedPercent(r.report.returnPercent)}`],
                   ['Trades', (r: SavedRun) => `${r.report.trades} (${fmtPercent(r.report.winRate, 1)} won)`],
