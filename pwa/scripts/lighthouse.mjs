@@ -25,10 +25,12 @@ const results = []
 try {
   for (let i = 1; i <= RUNS; i++) {
     const report = join(folder, `report-${i}.json`)
+    // Lighthouse has no --chrome-path flag: it takes the browser from CHROME_PATH, and without it falls back to
+    // whatever Chrome is installed (none on a fresh machine; an unpinned one on CI runners).
     await run('npx', [
       '--yes', LIGHTHOUSE, url, '--only-categories=performance', '--form-factor=mobile', '--output=json', `--output-path=${report}`, '--quiet',
-      '--max-wait-for-load=30000', `--chrome-path=${chromium.executablePath()}`, '--chrome-flags=--headless=new --no-sandbox --disable-dev-shm-usage',
-    ], { maxBuffer: 1 << 26 })
+      '--max-wait-for-load=30000', '--chrome-flags=--headless=new --no-sandbox --disable-dev-shm-usage',
+    ], { maxBuffer: 1 << 26, env: { ...process.env, CHROME_PATH: chromium.executablePath() } })
     const result = JSON.parse(readFileSync(report, 'utf8'))
     const score = Math.round((result.categories.performance.score ?? 0) * 100)
     const metric = (id) => result.audits[id]?.displayValue ?? '–'
