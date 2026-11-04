@@ -37,7 +37,10 @@ export function Sheet({
   useEffect(() => {
     const dialog = ref.current
     if (!dialog) return
-    const listener = () => closed()
+    // The browser fires `close` later, as a task: by then the sheet may be open again, and that event is stale.
+    const listener = () => {
+      if (!dialog.open) closed()
+    }
     dialog.addEventListener('close', listener)
     return () => dialog.removeEventListener('close', listener)
   }, [])
