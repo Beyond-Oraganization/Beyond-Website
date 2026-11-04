@@ -1,0 +1,21 @@
+/* ---------- colour tokens ----------
+   Copied from the website's beyondia.css (lines 17-28) and kept equal to it by tokens.node.test.ts.
+   c-* colours paint the ordinary sections, d-* colours the contrasting bands.
+   gain/loss are the app's own: the site has no status colours. They reach WCAG AA (4.5:1) on every surface. */
+:root{
+  --f-d:'Archivo Black','Arial Black',Impact,sans-serif;--f-t:'IBM Plex Mono','Courier New',monospace;--f-r:'IBM Plex Sans','Helvetica Neue',Arial,sans-serif;--ease:cubic-bezier(.16,1,.3,1);
+  color-scheme:light;
+  --c-bg:#FCBF49;--c-alt:#FDC964;--c-fg:#003049;--c-mute:#1F4A60;--c-line:rgba(0,48,73,.35);
+  --d-bg:#003049;--d-fg:#FCBF49;--d-mute:#F3C260;--d-line:rgba(252,191,73,.35);--d-lead:#F6D58E;
+  --accent:#D62828;--accent-ink:#FFFFFF;--band:#F77F00;--band-ink:#003049;--progress:#D62828;--outer:#003049;
+  --c-gain:#0A5C2B;--c-loss:#9B1B1B;--d-gain:#7FD8A0;--d-loss:#FF9C8F;
+  --status-bar:#003049;
+  --safe-top:env(safe-area-inset-top,0px);--safe-right:env(safe-area-inset-right,0px);--safe-bottom:env(safe-area-inset-bottom,0px);--safe-left:env(safe-area-inset-left,0px);
+  --header-h:64px;--bottom-h:64px
+}
+:root[data-theme="light"]{
+  --c-bg:#FCF5ED;--c-alt:#F9E3D2;--c-fg:#1F1717;--c-mute:#5A4646;--c-line:rgba(31,23,23,.35);
+  --d-bg:#F4BF96;--d-fg:#1F1717;--d-mute:#4A3838;--d-line:rgba(31,23,23,.35);--d-lead:#3B2B2B;
+  --accent:#A8394A;--accent-ink:#FFFFFF;--band:#CE5A67;--band-ink:#1F1717;--progress:#CE5A67;--outer:#F4BF96;
+  --c-gain:#0A5C2B;--c-loss:#9B1B1B;--d-gain:#0A5C2B;--d-loss:#9B1B1B
+}
