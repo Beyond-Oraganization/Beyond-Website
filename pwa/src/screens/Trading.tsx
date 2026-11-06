@@ -1,3 +1,4 @@
+import { useAccounts } from '../hooks/accounts.ts'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { useAction, useBot } from '../api/bot.ts'
@@ -145,6 +146,9 @@ function StartForm({ running }: { running: TradingSessionState[] }) {
   const errors = useMemo(() => (draft ? validateConfig(draft, definition) : {}), [draft, definition])
   const valid = Object.keys(errors).length === 0
   const replacing = draft ? running.some((s) => marketLabel(s.market) === draft.market) : false
+  // A LIVE account trades real money: the bot starts it only with --live, sent after this confirmation.
+  const { current } = useAccounts()
+  const live = current?.live ?? false
 
   if (!definitions || !marketRows || !draft)
     return strategies.error || markets.error ? <FailurePanel failure={(strategies.error ?? markets.error)!} /> : <Skeleton lines={4} />
@@ -197,18 +201,24 @@ function StartForm({ running }: { running: TradingSessionState[] }) {
       <ConfirmSheet
         open={confirming}
         onClose={() => setConfirming(false)}
-        title={replacing ? `Replace ${draft.market}?` : `Start trading ${draft.market}?`}
-        intro="The bot previews the newest candle and trades from the next close on; it keeps trading until you stop it or it logs out."
+        title={live ? `Trade ${draft.market} with real money?` : replacing ? `Replace ${draft.market}?` : `Start trading ${draft.market}?`}
+        intro={
+          live
+            ? `${current?.login} is a LIVE account: this strategy places real orders with real money. The bot previews the newest candle and trades from the next close on.`
+            : 'The bot previews the newest candle and trades from the next close on; it keeps trading until you stop it or it logs out.'
+        }
+        danger={live}
         review={[
+          ...(current ? [['Account', `${current.login}, ${current.broker.toLowerCase() === 'bybit' ? 'Bybit' : 'cTrader'} ${current.live ? 'LIVE' : 'DEMO'}`] as [string, string]] : []),
           ['Strategy', `${definition?.name} – ${definition?.title}`],
           ['Market', draft.market],
           ['Parameters', describeParams(input)],
           ...(input.rules?.length ? [['Rules, in order', <ol key="rules" className="rule-list mono">{input.rules.map((rule, index) => <li key={index}>{rule}</li>)}</ol>] as [string, ReactNode]] : []),
           ...(replacing ? [['Replaces', 'the session trading this market now'] as [string, string]] : []),
         ]}
-        confirmLabel={replacing ? 'Replace and start' : 'Start trading'}
+        confirmLabel={live ? 'Start with real money' : replacing ? 'Replace and start' : 'Start trading'}
         onConfirm={async () => {
-          const answer = await run(cmd.tradingStart(input), { invalidate: ['markets'] })
+          const answer = await run(cmd.tradingStart(input, live), { invalidate: ['markets'] })
           const { done } = notices(answer)
           toast.success('Trading', done[0] ?? `${draft.market} with ${draft.strategy}`)
           const reading = parseSignal(answer)

@@ -168,9 +168,15 @@ export function createBot(options = {}) {
   const rand = prng(options.seed ?? 7)
   const startedAt = now() - 3 * 86400e3 - 4 * 3600e3
 
-  const users = new Map([['demo', { password: 'demo-password', credentials: {} }]])
+  // The registered trading accounts (Accounts/AccountRegistry.cs): one simulated broker account stands behind all of them.
+  const users = new Map([['demo', { login: 'demo', password: 'demo-password', credentials: {}, broker: 'CTrader', mode: 'Demo' }]])
   const s = {
+    /** The account the running command acts on (set by run()). */
     user: null,
+    /** The open accounts (Hosting/Logins.cs), by lower-cased login: { login, signedInAt }. */
+    open: new Map(),
+    /** The account a run without a connection acts on: the old single-login bot, for direct callers and tests. */
+    startupUser: null,
     loginAt: null,
     account: { broker: 'cTrader', mode: 'Demo', accountId: '5012345', balance: 10000, currency: 'EUR', leverage: 30 },
     markets: new Map(),
@@ -557,24 +563,49 @@ export function createBot(options = {}) {
         ]),
       )
   }
+  // Opens the account unless it is open (another connection may have it open, with its strategies).
   function signIn(o, login) {
-    s.sessions.clear()
-    s.user = login
-    s.loginAt = now()
-    s.stats = { startBalance: s.account.balance, tradesOpened: 0, tradesClosed: 0, realizedProfit: 0, wins: 0, losses: 0 }
-    o.text('Connecting to CTrader…')
-    o.text(`✓ Welcome, ${login}.`)
-    o.text(`  cTrader DEMO account ${s.account.accountId}: balance ${F.money(s.account.balance, s.account.currency)}, ${s.positions.length} open position(s). Run session for details.`)
+    const user = users.get(login.toLowerCase())
+    if (!s.open.has(login.toLowerCase())) {
+      if (!s.open.size) {
+        s.loginAt = now()
+        s.stats = { startBalance: s.account.balance, tradesOpened: 0, tradesClosed: 0, realizedProfit: 0, wins: 0, losses: 0 }
+      }
+      s.open.set(login.toLowerCase(), { login: user?.login ?? login, signedInAt: now() })
+    }
+    s.user = user?.login ?? login
+    const mode = (user?.mode ?? 'Demo') === 'Live' ? 'LIVE' : 'DEMO'
+    o.text(`Connecting to ${user?.broker ?? 'CTrader'} ${mode === 'LIVE' ? 'LIVE' : 'Demo'}…`)
+    o.text(`✓ Welcome, ${s.user}.`)
+    o.text(`  ${user?.broker === 'Bybit' ? 'Bybit' : 'cTrader'} ${mode} account ${s.account.accountId}: balance ${F.money(s.account.balance, s.account.currency)}, ${s.positions.length} open position(s). Run session for details.`)
+  }
+
+  const describeAccount = (login, current) => {
+    const user = users.get(login.toLowerCase())
+    const open = s.open.get(login.toLowerCase())
+    return {
+      login: open?.login ?? login, broker: user?.broker ?? 'CTrader', mode: user?.mode ?? 'Demo', current, connected: true,
+      accountId: s.account.accountId, balance: s.account.balance, currency: s.account.currency, strategies: s.sessions.size,
+      signedInAt: new Date(open?.signedInAt ?? now()).toISOString(), error: null,
+    }
   }
 
   const commands = {
-    status: (o) => {
+    status: (o, argv) => {
+      const { opt } = readArgs(argv, { '--json': {} })
+      if (opt.json) {
+        const accounts = (ctx.connection ? ctx.connection.accounts : [...s.open.values()].map((a) => a.login)).filter((l) => s.open.has(l.toLowerCase()))
+        const value = { version: '2.0.0', startedAt: new Date(startedAt).toISOString(), databaseConnected: !s.databaseDown, schemaVersion: s.databaseDown ? 0 : 3,
+          databaseError: s.databaseDown ? 'Cannot reach MySQL at localhost:3306.' : null, accounts: accounts.map((l) => describeAccount(l, l === s.user)) }
+        o.text(JSON.stringify(value, null, 2))
+        return s.databaseDown ? 1 : { json: value }
+      }
       o.text('Checking…')
       o.section('Status', (x) =>
         x.grid([
           ['Version', `2.0.0, up ${F.duration((now() - startedAt) / 1000)}`],
           ['Database', s.databaseDown ? 'unavailable (Cannot reach MySQL at localhost:3306.)' : 'connected in 3 ms: BeyondBotDB@localhost:3306, schema v2'],
-          ['User', s.user ?? 'not logged in'], ['Broker', s.user ? 'connected to cTrader DEMO' : 'connects after login'],
+          ['User', s.user ?? 'not logged in'], ['Broker', s.user ? `connected to ${users.get(s.user.toLowerCase())?.broker === 'Bybit' ? 'Bybit' : 'cTrader'} ${users.get(s.user.toLowerCase())?.mode === 'Live' ? 'LIVE' : 'DEMO'}` : 'connects after login'],
           ['Trading', `${s.sessions.size} strategy session(s)`], ['Credentials', '/var/lib/beyondbot/Credentials'], ['Log', snapshotLog()],
         ]),
       )
@@ -604,21 +635,70 @@ export function createBot(options = {}) {
       if (!/^[\w.-]+$/.test(login)) throw new Exit(1, "Login may only contain letters, digits, '.', '_' and '-'.")
       const user = users.get(login.toLowerCase())
       if (!user || user.password !== opt.password) throw new Exit(1, 'Invalid login or password.')
-      signIn(o, login)
+      signIn(o, user.login)
+      if (ctx.connection) {
+        if (!ctx.connection.accounts.includes(user.login)) ctx.connection.accounts.push(user.login)
+        ctx.connection.current = user.login
+        ctx.picked = null
+        if (ctx.connection.accounts.length > 1)
+          o.text(`  This connection holds ${ctx.connection.accounts.length} accounts; commands now act on ${user.login} ('accounts' lists them, 'use' switches).`)
+      } else s.startupUser = user.login
     },
+    // Lets go of an account; with --stop also stops its strategies and closes it (Cli/Commands/AccountCommands.cs).
     logout: (o, argv) => {
-      const { opt } = readArgs(argv, { '--yes': { alias: '-y' } })
-      if (!s.user) return o.text('Nobody is logged in.')
-      if (s.sessions.size && !opt.yes) throw new Exit(1, `${s.sessions.size} strategy session(s) are trading. Stop them and log out? Pass --yes to confirm without being asked.`)
-      const name = s.user
-      s.sessions.clear()
-      s.user = null
-      o.text('Stopping…')
-      o.text(`✓ Logged out ${name}.`)
+      const { pos, opt } = readArgs(argv, { '--stop': {}, '--yes': { alias: '-y' } })
+      const held = ctx.connection ? ctx.connection.accounts : s.startupUser ? [s.startupUser] : []
+      const name = pos[0] ? held.find((l) => l.toLowerCase() === pos[0].toLowerCase()) : s.user
+      if (pos[0] && !name) throw new Exit(1, `This connection is not signed in to '${pos[0]}'.`)
+      if (!name) return o.text('Nobody is logged in.')
+      const running = s.sessions.size
+      if (opt.stop) {
+        if (running && !opt.yes) throw new Exit(1, `${running} strategy session(s) of '${name}' are trading. Stop them and log out? Pass --yes to confirm without being asked.`)
+        s.sessions.clear()
+        s.open.delete(name.toLowerCase())
+        o.text('Stopping…')
+        o.text(`✓ Stopped and logged out ${name}.`)
+      } else {
+        o.text(`✓ Logged out ${name}.`)
+        if (running) o.text(`  Its ${running} strategy session(s) keep trading. Log in again to see them, or stop them with: logout ${name} --stop`)
+      }
+      if (ctx.connection) {
+        ctx.connection.accounts = ctx.connection.accounts.filter((l) => l !== name)
+        if (ctx.connection.current === name) ctx.connection.current = ctx.connection.accounts.at(-1) ?? null
+        if (ctx.picked === name) ctx.picked = null
+        if (ctx.connection.current) o.text(`  Commands now act on ${ctx.connection.current}.`)
+      } else if (s.startupUser === name) s.startupUser = null
+    },
+    use: (o, argv) => {
+      const { pos } = readArgs(argv)
+      const held = ctx.connection ? ctx.connection.accounts : s.startupUser ? [s.startupUser] : []
+      const name = held.find((l) => l.toLowerCase() === String(pos[0] ?? '').toLowerCase())
+      if (!name) throw new Exit(1, `This connection is not signed in to '${pos[0] ?? ''}'. Log in to it first: login ${pos[0] ?? ''}`)
+      if (ctx.connection) ctx.connection.current = name
+      ctx.picked = null
+      s.user = name
+      const user = users.get(name.toLowerCase())
+      o.text(`✓ Commands now act on ${name} (${user?.broker ?? 'CTrader'} ${user?.mode === 'Live' ? 'LIVE' : 'DEMO'}).`)
+    },
+    accounts: (o, argv) => {
+      const { opt } = readArgs(argv, { '--json': {} })
+      const held = (ctx.connection ? ctx.connection.accounts : s.startupUser ? [s.startupUser] : []).filter((l) => s.open.has(l.toLowerCase()))
+      const list = held.map((l) => describeAccount(l, l === s.user))
+      if (opt.json) {
+        o.text(JSON.stringify(list, null, 2))
+        return { json: list }
+      }
+      if (!list.length) return o.text("This connection holds no trading account. Add one with 'login' (or 'register' to create one).")
+      o.table(['', 'Login', 'Broker', 'Mode', 'Account', 'Balance', 'Strategies', 'Since'], list.map((a) => [a.current ? '▸' : '', a.login, a.broker, a.mode === 'Live' ? 'LIVE' : 'DEMO', a.accountId ?? '', F.money(a.balance, a.currency), String(a.strategies), F.time(Date.parse(a.signedInAt))]))
     },
     register: (o, argv) => {
-      const { pos, opt } = readArgs(argv, { '--password': { value: true }, '--credential': { value: true, multiple: true }, '--force': { alias: '-f' } })
+      const { pos, opt } = readArgs(argv, { '--password': { value: true }, '--credential': { value: true, multiple: true }, '--broker': { value: true }, '--mode': { value: true }, '--confirm-live': {} })
       const login = pos[0]
+      const broker = { ctrader: 'CTrader', bybit: 'Bybit' }[String(opt.broker ?? 'ctrader').toLowerCase()]
+      if (!broker) throw new Exit(1, `Unknown broker '${opt.broker}'. Use one of: CTrader, Bybit.`)
+      const mode = { demo: 'Demo', live: 'Live' }[String(opt.mode ?? 'demo').toLowerCase()]
+      if (!mode) throw new Exit(1, `Unknown mode '${opt.mode}'. Use Demo or Live.`)
+      const fields = broker === 'Bybit' ? ['API_KEY', 'API_SECRET'] : ['CLIENT_ID', 'CLIENT_SECRET', 'ACCESS_TOKEN', 'REFRESH_TOKEN', 'ACCOUNT_ID']
       const credentials = {}
       for (const pair of opt.credential ?? []) {
         const at = pair.indexOf('=')
@@ -630,14 +710,20 @@ export function createBot(options = {}) {
         credentials[key] = pair.slice(at + 1)
       }
       if (!login) throw new Exit(1, 'Choose a login is required; pass it with the LOGIN argument.')
-      if (users.has(login.toLowerCase()) && !opt.force) throw new Exit(1, `'${login}' already exists. Replace it? Pass --force to confirm without being asked.`)
+      if (login.length < 3 || login.length > 64) throw new Exit(1, 'A login has 3 to 64 characters.')
+      if (!/^[\w.-]+$/.test(login)) throw new Exit(1, "A login may only contain letters, digits, '.', '_' and '-'.")
+      if (users.has(login.toLowerCase())) throw new Exit(1, `The login '${login}' is taken; choose another.`)
       if (opt.password == null) throw new Exit(1, 'Choose a password is required; pass it with --password.')
-      if (!opt.password) throw new Exit(1, 'The password cannot be empty.')
-      for (const [key, label] of [['CLIENT_ID', 'Client ID'], ['CLIENT_SECRET', 'Client secret'], ['ACCESS_TOKEN', 'Access token'], ['ACCOUNT_ID', 'Account ID']])
+      if (opt.password.length < 8) throw new Exit(1, 'A password has at least 8 characters.')
+      if (mode === 'Live' && !opt['confirm-live']) throw new Exit(1, `Register '${login}' as a LIVE ${broker} account? Its strategies trade real money. Pass --confirm-live to confirm without being asked.`)
+      for (const key of Object.keys(credentials))
+        if (!fields.includes(key)) throw new Exit(1, `${key} is a ${broker === 'Bybit' ? 'CTrader' : 'Bybit'} field; this account trades through ${broker}.`)
+      const required = broker === 'Bybit' ? [['API_KEY', 'API key'], ['API_SECRET', 'API secret']] : [['CLIENT_ID', 'Client ID'], ['CLIENT_SECRET', 'Client secret'], ['ACCESS_TOKEN', 'Access token'], ['ACCOUNT_ID', 'Account ID']]
+      for (const [key, label] of required)
         if (!credentials[key]) throw new Exit(1, `${label} is required; pass it with --credential ${key}=….`)
-      if (!/^\d+$/.test(credentials.ACCOUNT_ID)) throw new Exit(1, 'The account ID is a number.')
-      users.set(login.toLowerCase(), { password: opt.password, credentials })
-      o.text(`✓ Registered ${login}; credentials encrypted in /var/lib/beyondbot/Credentials. Log in with: login ${login}`)
+      if (broker === 'CTrader' && !/^\d+$/.test(credentials.ACCOUNT_ID)) throw new Exit(1, 'The account ID is a number.')
+      users.set(login.toLowerCase(), { login, password: opt.password, credentials, broker, mode })
+      o.text(`✓ Registered ${login} (${broker} ${mode === 'Live' ? 'LIVE' : 'DEMO'}); credentials encrypted in /var/lib/beyondbot/Credentials. Log in with: login ${login}`)
     },
     credentials: (o, argv) => {
       const { opt } = readArgs(argv, { '--password': { value: true }, '--new-password': { value: true }, '--credential': { value: true, multiple: true } })
@@ -646,11 +732,12 @@ export function createBot(options = {}) {
       if (opt.password == null) throw new Exit(1, 'Current password is required; pass it with --password.')
       if (opt.password !== user.password) throw new Exit(1, 'Incorrect password.')
       if (opt['new-password'] === '') throw new Exit(1, 'The new password cannot be empty.')
+      if (opt['new-password'] && opt['new-password'].length < 8) throw new Exit(1, 'A password has at least 8 characters.')
       if (opt['new-password']) user.password = opt['new-password']
       o.text('✓ Credentials saved.')
       if (opt['new-password'] && s.user === 'demo')
         o.text('⚠ The server signs in as demo at startup with its password file; put the new password there too (on a systemd install: /etc/beyondbot/password), or the next start stays signed out.')
-      if (s.sessions.size) o.text('Strategies are trading with the old credentials; they take effect at your next login.')
+      if (s.sessions.size) o.text('The account is trading or open on another connection, so it keeps its old credentials until it is next opened.')
       else signIn(o, s.user)
     },
     'market list': (o) => {
@@ -816,8 +903,10 @@ export function createBot(options = {}) {
       o.text(describeParams(input.params, input.rules))
     },
     'trading start': (o, argv) => {
-      const input = strategyInput(argv)
+      const input = strategyInput(argv, { '--live': {} })
       requireLogin()
+      if (users.get(s.user.toLowerCase())?.mode === 'Live' && !input.opt.live)
+        throw new Exit(1, `'${s.user}' is a LIVE ${users.get(s.user.toLowerCase()).broker} account: this strategy trades real money. Start it? Pass --live to confirm without being asked.`)
       const market = marketOrFail(input.symbol, input.interval)
       o.text(`Starting drcs on ${market.symbol} ${market.interval.code}…`)
       const key = keyOf(market.symbol, market.interval.code)
@@ -934,6 +1023,8 @@ export function createBot(options = {}) {
   createMarket('EURUSD', parseInterval('4h'), 900)
   if (options.signedIn !== false) {
     signIn(new Out(), 'demo')
+    // The server's own startup account: a connection reaches it only by signing in to it.
+    s.startupUser = 'demo'
     s.stats.startBalance = 9875.4
     s.account.balance = 10012.85
     s.stats.realizedProfit = 137.45
@@ -977,7 +1068,22 @@ COMMANDS:
     orders         list, place, close, clear`
 
   /** Runs one command; resolves to the same CommandResult the real API sends. */
-  async function run(argv, { signal } = {}) {
+  // The running command's connection (server.mjs): { accounts, current }; none for a direct caller (the old single-login bot).
+  const ctx = { connection: undefined, picked: null }
+
+  /**
+   * Runs one command; resolves to the same CommandResult the real API sends. `connection` is the caller's bot
+   * connection ({ accounts, current }, changed by login, logout and use); `account` one of its accounts picked for
+   * this command only. Without `connection` the bot behaves as before accounts: one login for every caller.
+   */
+  async function run(argv, { signal, connection, account } = {}) {
+    ctx.connection = connection
+    ctx.picked = account ?? null
+    const acting = () => {
+      const login = connection ? (ctx.picked ?? connection.current) : s.startupUser
+      return login && s.open.has(login.toLowerCase()) ? s.open.get(login.toLowerCase()).login : null
+    }
+    s.user = acting()
     const o = new Out()
     let code = 0
     let error = null
@@ -1020,7 +1126,7 @@ COMMANDS:
         json = null
       }
     }
-    return { exitCode: code, output: text, blocks, error, json }
+    return { exitCode: code, output: text, blocks, error, json, account: connection ? acting() : undefined }
   }
 
   return {

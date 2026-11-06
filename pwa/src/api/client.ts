@@ -1,8 +1,15 @@
 import { ExitCode, type CommandResult, type OutputBlock } from './types.ts'
 import { bodyBytes, bodyFor, describe, MAX_BODY_BYTES, normalize, refusal } from './refusal.ts'
 
-/** Where a bot answers, and the key it wants. */
-export type Target = { url: string; key: string }
+/**
+ * Where a bot answers, the key it wants, and this device's connection to it: the token its first login answered
+ * with (Api/ApiConnections.cs), and optionally one of that connection's accounts for this command only.
+ */
+export type Target = { url: string; key: string; connection?: string | null; account?: string | null }
+
+/** The request headers of a bot connection (Api/CommandApi.cs). */
+export const CONNECTION_HEADER = 'X-BeyondBot-Connection'
+export const ACCOUNT_HEADER = 'X-BeyondBot-Account'
 
 /** Every way a command can end, so screens never have to inspect HTTP themselves. */
 export type Outcome =
@@ -10,6 +17,8 @@ export type Outcome =
   | { kind: 'failed'; result: CommandResult; roundTripMs: number }
   | { kind: 'usage'; result: CommandResult; roundTripMs: number }
   | { kind: 'signedOut'; result: CommandResult; roundTripMs: number }
+  /** 403: the device's connection expired (or the bot restarted), or the picked account is not on it. */
+  | { kind: 'expired'; result: CommandResult; roundTripMs: number }
   | { kind: 'cancelled' }
   | { kind: 'unauthorized' }
   | { kind: 'tooLarge' }
@@ -45,6 +54,8 @@ export function readResult(json: unknown): CommandResult {
     blocks: value.blocks.filter(isBlock),
     error: value.error ? { message: String(value.error.message ?? ''), hint: value.error.hint ?? null } : null,
     json: value.json ?? null,
+    account: typeof value.account === 'string' ? value.account : null,
+    connection: typeof value.connection === 'string' ? value.connection : null,
   }
 }
 
@@ -57,6 +68,8 @@ const localResult = (args: string[], message: string, hint: string | null): Comm
   blocks: [],
   error: { message, hint },
   json: null,
+  account: null,
+  connection: null,
 })
 
 function classify(result: CommandResult, roundTripMs: number): Outcome {
@@ -87,9 +100,12 @@ export async function runCommand(target: Target, args: string[], options: { sign
   const started = performance.now()
   let response: Response
   try {
+    const headers: Record<string, string> = { Authorization: `Bearer ${target.key}`, 'Content-Type': 'application/json' }
+    if (target.connection) headers[CONNECTION_HEADER] = target.connection
+    if (target.account) headers[ACCOUNT_HEADER] = target.account
     response = await fetch(endpoint(target.url), {
       method: 'POST',
-      headers: { Authorization: `Bearer ${target.key}`, 'Content-Type': 'application/json' },
+      headers,
       body: bodyFor(argv),
       signal: options.signal,
       cache: 'no-store',
@@ -112,6 +128,13 @@ export async function runCommand(target: Target, args: string[], options: { sign
     return { kind: 'badResponse', status: response.status, reason: 'The answer is not JSON.' }
   }
   const roundTripMs = performance.now() - started
+  if (response.status === 403) {
+    try {
+      return { kind: 'expired', result: readResult(body), roundTripMs }
+    } catch {
+      return { kind: 'expired', result: localResult(argv, 'This connection has expired; sign in again.', null), roundTripMs }
+    }
+  }
   if (response.status !== 200 && response.status !== 400)
     return { kind: 'badResponse', status: response.status, reason: `The bot answered HTTP ${response.status}.` }
   try {
@@ -144,6 +167,7 @@ export function explain(outcome: Outcome): { message: string; hint: string | nul
       return { message: 'Done.', hint: null }
     case 'failed':
     case 'usage':
+    case 'expired':
     case 'signedOut': {
       const error = outcome.result.error
       if (error) return { message: error.message, hint: error.hint }

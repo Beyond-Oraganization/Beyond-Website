@@ -328,13 +328,13 @@ export default function Session() {
         <Section variant="dark" labelledBy="screen-title">
           <p className="kicker">Session</p>
           <h1 className="title" id="screen-title">
-            The bot is not signed in.
+            No trading account yet.
           </h1>
           <p className="lead on-band" style={{ marginTop: 16 }}>
-            It has no session until one of its logins signs in and connects to the broker. Stored data (markets, backtests) still works.
+            This device reaches a trading account only after signing in to it with the account’s password, even one the bot is already trading. Markets and backtests work without one.
           </p>
           <div className="btn-row" style={{ marginTop: 28 }}>
-            <ButtonLink to="/account">Sign the bot in</ButtonLink>
+            <ButtonLink to="/account">Add a trading account</ButtonLink>
             <ButtonLink to="/markets" variant="ghost">
               Markets
             </ButtonLink>

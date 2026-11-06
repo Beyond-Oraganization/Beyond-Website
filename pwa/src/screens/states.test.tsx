@@ -134,11 +134,11 @@ describe('Session', () => {
     expect(screen.getByRole('heading', { name: 'Open positions' })).toBeInTheDocument()
   })
 
-  it('says the bot is not signed in (exit code 3) and offers to sign it in', async () => {
+  it('says this device has no trading account (exit code 3) and offers to add one', async () => {
     overrides.push(['session', failed(3, 'You need to log in first.', "Run 'login' (or 'register' to create an account).")])
     show(<Session />)
-    expect(await screen.findByRole('heading', { name: 'The bot is not signed in.' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Sign the bot in' })).toHaveAttribute('href', '/account')
+    expect(await screen.findByRole('heading', { name: 'No trading account yet.' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Add a trading account' })).toHaveAttribute('href', '/account')
   })
 
   it('explains the bot’s two-markets bug and shows the broker’s positions instead', async () => {

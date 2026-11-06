@@ -17,12 +17,19 @@ export type Connection = {
   botVersion?: string | null
 }
 
-type Saved = { connections: Connection[]; activeId: string | null }
+type Saved = { connections: Connection[]; activeId: string | null; tokens?: Record<string, string> }
 
 type ConnectionState = Saved & {
   loaded: boolean
   /** Unsealed API keys, in memory only. */
   keys: Record<string, string>
+  /**
+   * Each bot's connection token: what its first login answered with, sent with every command so the bot knows
+   * which trading accounts this device signed in to. Kept on the device (useless without the API key) until the
+   * bot says it expired; a restart of the bot forgets it too.
+   */
+  tokens: Record<string, string>
+  setToken: (id: string, token: string | null) => Promise<void>
   load: () => Promise<void>
   add: (input: { name: string; url: string; key: string; storage: KeyStorage; passphrase?: string }) => Promise<Connection>
   update: (id: string, patch: Partial<Omit<Connection, 'id'>>) => Promise<void>
@@ -46,13 +53,14 @@ export function normalizeUrl(input: string): string {
 }
 
 export const useConnections = create<ConnectionState>((set, get) => {
-  const save = () => db.set(SAVED, { connections: get().connections, activeId: get().activeId } satisfies Saved)
+  const save = () => db.set(SAVED, { connections: get().connections, activeId: get().activeId, tokens: get().tokens } satisfies Saved)
 
   return {
     loaded: false,
     connections: [],
     activeId: null,
     keys: {},
+    tokens: {},
 
     async load() {
       const saved = (await db.get<Saved>(SAVED)) ?? { connections: [], activeId: null }
@@ -66,7 +74,7 @@ export const useConnections = create<ConnectionState>((set, get) => {
           }
         }
       }
-      set({ ...saved, keys, loaded: true })
+      set({ connections: saved.connections, activeId: saved.activeId, tokens: saved.tokens ?? {}, keys, loaded: true })
     },
 
     async add({ name, url, key, storage, passphrase }) {
@@ -93,13 +101,24 @@ export const useConnections = create<ConnectionState>((set, get) => {
       const connections = get().connections.filter((c) => c.id !== id)
       const keys = { ...get().keys }
       delete keys[id]
-      set({ connections, keys, activeId: get().activeId === id ? (connections[0]?.id ?? null) : get().activeId })
+      const tokens = { ...get().tokens }
+      delete tokens[id]
+      set({ connections, keys, tokens, activeId: get().activeId === id ? (connections[0]?.id ?? null) : get().activeId })
       await save()
       // Everything this device remembered about that bot goes too.
       await db.delPrefixed(`cache:${id}:`)
       await db.del(`ticks:${id}`)
       await db.del(`activity:${id}`)
       await db.del(`backtests:${id}`)
+    },
+
+    async setToken(id, token) {
+      if ((get().tokens[id] ?? null) === token) return
+      const tokens = { ...get().tokens }
+      if (token) tokens[id] = token
+      else delete tokens[id]
+      set({ tokens })
+      await save()
     },
 
     async setActive(id) {

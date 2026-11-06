@@ -25,7 +25,8 @@ export function parseStatus(result: CommandResult): Parsed<StatusReading> {
   const version = /^(\S+), up (.+)$/.exec(map.get('Version') ?? '')
   const database = map.get('Database') ?? ''
   const broker = map.get('Broker') ?? ''
-  const user = map.get('User') ?? ''
+  // "beyond (+1 more on this connection: accounts)" when the connection holds several accounts.
+  const user = (map.get('User') ?? '').replace(/\s*\(\+\d+ more on this connection.*\)$/, '')
   return parsed({
     version: version?.[1] ?? null,
     uptime: parseDuration(version?.[2] ?? null),

@@ -17,22 +17,36 @@ export const queryClient = new QueryClient({
   },
 })
 
-/** What the app knows about a bot's reachability, from every answer it got. */
-export type BotHealth = { signedOut: boolean; unauthorized: boolean; unreachable: boolean; lastOkAt: number | null }
-const healthy: BotHealth = { signedOut: false, unauthorized: false, unreachable: false, lastOkAt: null }
+/**
+ * What the app knows about a bot's reachability, from every answer it got. `account` is the trading account the
+ * latest answer acted on (null when this device's connection holds none).
+ */
+export type BotHealth = { signedOut: boolean; unauthorized: boolean; unreachable: boolean; lastOkAt: number | null; account: string | null }
+const healthy: BotHealth = { signedOut: false, unauthorized: false, unreachable: false, lastOkAt: null, account: null }
 
-export const useHealth = create<{ byId: Record<string, BotHealth>; report: (id: string, kind: Outcome['kind'], command: string) => void }>((set, get) => ({
+type Report = { kind: Outcome['kind']; command: string; account: string | null }
+
+export const useHealth = create<{ byId: Record<string, BotHealth>; report: (id: string, report: Report) => void }>((set, get) => ({
   byId: {},
-  report(id, kind, command) {
+  report(id, { kind, command, account }) {
     const now = get().byId[id] ?? healthy
     const next: BotHealth = { ...now }
+    // A bot from before accounts never names one; then only the commands below tell.
+    if (account) {
+      next.account = account
+      next.signedOut = false
+    }
+    if (kind === 'expired') {
+      next.signedOut = true
+      next.account = null
+    }
     if (kind === 'unreachable') next.unreachable = true
     else if (kind !== 'cancelled') next.unreachable = false
     if (kind === 'unauthorized') next.unauthorized = true
     else if (kind !== 'unreachable' && kind !== 'cancelled') next.unauthorized = false
     if (kind === 'signedOut') next.signedOut = true
     if (kind === 'ok' && /^(session|balance|positions|login|credentials|signal|trading|orders place|orders close|market add|market sync)\b/.test(command)) next.signedOut = false
-    if (kind === 'ok' || kind === 'failed' || kind === 'usage' || kind === 'signedOut') next.lastOkAt = Date.now()
+    if (kind === 'ok' || kind === 'failed' || kind === 'usage' || kind === 'signedOut' || kind === 'expired') next.lastOkAt = Date.now()
     if (JSON.stringify(next) !== JSON.stringify(now)) set({ byId: { ...get().byId, [id]: next } })
   },
 }))
@@ -47,10 +61,12 @@ export function queueFor(id: string): CommandQueue {
       const state = useConnections.getState()
       const connection = state.connections.find((c) => c.id === id)
       const key = state.keys[id]
-      return connection && key ? { url: connection.url, key } : null
+      return connection && key ? { url: connection.url, key, connection: state.tokens[id] ?? null } : null
     })
     queue.onFinished((finished) => {
-      useHealth.getState().report(id, finished.outcome, finished.command)
+      if (finished.connection) void useConnections.getState().setToken(id, finished.connection)
+      else if (finished.outcome === 'expired') void useConnections.getState().setToken(id, null)
+      useHealth.getState().report(id, { kind: finished.outcome, command: finished.command, account: finished.account })
       // Successful background polls would bury everything else; failures and actions are kept.
       if (finished.priority !== 'poll' || finished.outcome !== 'ok') useLogs.getState().addActivity(id, finished)
     })
@@ -139,11 +155,12 @@ export function useAction() {
   const { connection, queue } = useBot()
   const client = useQueryClient()
   return useCallback(
-    async (args: string[], options: { invalidate?: string[]; accept?: number[]; signal?: AbortSignal } = {}): Promise<CommandResult> => {
+    async (args: string[], options: { invalidate?: string[]; accept?: number[]; signal?: AbortSignal; account?: string | null } = {}): Promise<CommandResult> => {
       if (!queue || !connection) throw new CommandFailure({ kind: 'unreachable', reason: 'No bot is connected.' })
-      const outcome = await queue.run(args, { priority: 'interactive', signal: options.signal, share: false })
+      const outcome = await queue.run(args, { priority: 'interactive', signal: options.signal, share: false, account: options.account ?? null })
       if (!ok(outcome, options.accept ?? [])) throw new CommandFailure(outcome)
-      for (const name of new Set(['session', ...(options.invalidate ?? [])])) void client.invalidateQueries({ queryKey: ['bot', connection.id, name] })
+      // Every account change shows on the accounts list, the status and the session.
+      for (const name of new Set(['session', 'accounts', 'status', ...(options.invalidate ?? [])])) void client.invalidateQueries({ queryKey: ['bot', connection.id, name] })
       return outcome.result
     },
     [client, connection, queue],
