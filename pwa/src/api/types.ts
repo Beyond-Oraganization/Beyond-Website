@@ -23,6 +23,10 @@ export type CommandResult = {
   blocks: OutputBlock[]
   error: CommandError | null
   json: unknown
+  /** The trading account the command acted on; null when the connection holds none (or the bot predates accounts). */
+  account?: string | null
+  /** Only in the answer to the login that created this device's connection: its token. */
+  connection?: string | null
 }
 
 /** Cli/ErrorReporter.cs */

@@ -15,10 +15,15 @@ export type Finished = {
   elapsedMs: number | null
   roundTripMs: number | null
   at: number
+  /** The account the command acted on, as the bot said. */
+  account: string | null
+  /** The connection token a first login answered with. */
+  connection: string | null
 }
 
 type Job = {
   args: string[]
+  account: string | null
   key: string
   priority: Priority
   shared: boolean
@@ -27,7 +32,8 @@ type Job = {
   resolve: (outcome: Outcome) => void
 }
 
-type RunOptions = { priority?: Priority; signal?: AbortSignal; share?: boolean }
+/** `account`: one of this device's accounts on the bot, for this command only (X-BeyondBot-Account). */
+type RunOptions = { priority?: Priority; signal?: AbortSignal; share?: boolean; account?: string | null }
 
 /**
  * The bot runs one command at a time, for every client (Api/CommandRunner.cs). This queue does the same on the
@@ -47,9 +53,9 @@ export class CommandQueue {
     this.target = target
   }
 
-  run(args: string[], { priority = 'interactive', signal, share = priority !== 'interactive' }: RunOptions = {}): Promise<Outcome> {
+  run(args: string[], { priority = 'interactive', signal, share = priority !== 'interactive', account = null }: RunOptions = {}): Promise<Outcome> {
     const argv = normalize(args)
-    const key = argv.join('\u0000')
+    const key = [account ?? '', ...argv].join('\u0000')
     if (share) {
       const same = [this.running, ...this.pending].find((job) => job && job.shared && job.key === key)
       if (same) {
@@ -64,7 +70,7 @@ export class CommandQueue {
 
     let resolve!: (outcome: Outcome) => void
     const promise = new Promise<Outcome>((done) => (resolve = done))
-    const job: Job = { args: argv, key, priority, shared: share, controller: new AbortController(), promise, resolve }
+    const job: Job = { args: argv, account, key, priority, shared: share, controller: new AbortController(), promise, resolve }
     if (signal) {
       if (signal.aborted) return Promise.resolve({ kind: 'cancelled' })
       // A shared read keeps going for its other callers.
@@ -102,7 +108,7 @@ export class CommandQueue {
 
     const target = this.target()
     const outcome: Outcome = target
-      ? await runCommand(target, job.args, { signal: job.controller.signal })
+      ? await runCommand(job.account ? { ...target, account: job.account } : target, job.args, { signal: job.controller.signal })
       : { kind: 'unreachable', reason: 'No bot is connected.' }
 
     job.resolve(outcome)
@@ -115,6 +121,8 @@ export class CommandQueue {
       elapsedMs: answered ? answered.result.elapsedMs : null,
       roundTripMs: answered ? Math.round(answered.roundTripMs) : null,
       at: Date.now(),
+      account: answered?.result.account ?? null,
+      connection: answered?.result.connection ?? null,
     }
     this.finishedListeners.forEach((listener) => listener(finished))
     this.running = null

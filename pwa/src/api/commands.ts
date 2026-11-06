@@ -7,6 +7,10 @@
 
 export type SessionSection = 'account' | 'positions' | 'stats' | 'strategies' | 'system'
 
+/** The brokers a trading account can use (Brokers/BrokerFactory.cs), and whether it trades real money. */
+export type Broker = 'CTrader' | 'Bybit'
+export type Mode = 'demo' | 'live'
+
 export type StrategyInput = {
   strategy: string
   symbol: string
@@ -48,14 +52,24 @@ export const cmd = {
   status: () => ['status'],
   session: (section?: SessionSection) => (section ? ['session', section, '--json'] : ['session', '--json']),
 
+  /** Adds the account to this device's connection; the accounts signed in before stay signed in. */
   login: (login: string, password: string) => ['login', login, `--password=${password}`],
-  logout: () => ['logout', '-y'],
-  register: (login: string, password: string, credentials: [string, string][], force = false) => [
+  /** Lets go of an account (the current one by default); with `stop`, also stops its strategies and disconnects it. */
+  logout: (login?: string | null, stop = false) => ['logout', ...(login ? [login] : []), ...(stop ? ['--stop', '-y'] : [])],
+  accounts: () => ['accounts', '--json'],
+  /** Makes one of this connection's accounts the one commands act on. */
+  use: (login: string) => ['use', login],
+  /** A new trading account; a live one only after the app's own confirmation (--confirm-live). */
+  register: (login: string, password: string, broker: Broker, mode: Mode, credentials: [string, string][]) => [
     'register',
     login,
     `--password=${password}`,
+    '--broker',
+    broker,
+    '--mode',
+    mode,
+    ...(mode === 'live' ? ['--confirm-live'] : []),
     ...credentialArgs(credentials),
-    ...(force ? ['--force'] : []),
   ],
   credentials: (current: string, next: string | null, credentials: [string, string][]) => [
     'credentials',
@@ -100,7 +114,8 @@ export const cmd = {
     ...(to != null ? ['--to', utcArg(to)] : []),
   ],
 
-  tradingStart: (input: StrategyInput) => ['trading', 'start', ...strategyArgs(input)],
+  /** On a live account, `live` confirms trading real money (--live) after the app's own confirmation. */
+  tradingStart: (input: StrategyInput, live = false) => ['trading', 'start', ...strategyArgs(input), ...(live ? ['--live'] : [])],
   tradingStop: (symbol?: string, interval?: string) => ['trading', 'stop', ...(symbol ? [symbol] : []), ...(symbol && interval ? [interval] : [])],
   tradingStatus: () => ['trading', 'status'],
 
@@ -121,8 +136,8 @@ export function isDestructive(args: string[]): boolean {
   if (first === 'orders' && (second === 'place' || second === 'close' || second === 'clear')) return true
   if (first === 'market' && second === 'remove') return true
   if (first === 'trading' && (second === 'stop' || second === 'start')) return true
-  if (first === 'logout' || first === 'login') return true
+  if (first === 'logout' && args.some((arg) => arg === '--stop')) return true
   if (first === 'credentials') return true
-  if (first === 'register' && args.some((arg) => arg === '-f' || arg === '--force')) return true
+  if (args.some((arg) => arg === '--live' || arg === '--confirm-live')) return true
   return false
 }

@@ -35,10 +35,19 @@ function ConnectionChip() {
     )
   const state = health.unauthorized || health.unreachable ? 'bad' : busy ? 'busy' : health.lastOkAt ? 'ok' : ''
   const words = health.unauthorized ? 'key refused' : health.unreachable ? 'unreachable' : busy ? 'busy' : health.lastOkAt ? 'connected' : 'connecting'
+  // The bot, and the trading account its answers act on (none until this device signs in to one).
+  const account = health.account
+  const shown = account ? `${connection.name} · ${account}` : connection.name
   return (
-    <button type="button" className="conn" onClick={() => navigate('/connections')} aria-label={`${connection.name}: ${words}. Manage connections`}>
+    <button
+      type="button"
+      className="conn"
+      onClick={() => navigate('/connections')}
+      // Starts with the visible text, so voice control finds the button by what it shows.
+      aria-label={`${shown}: ${words}${account ? '' : ', no trading account'}. Manage connections`}
+    >
       <span className={cx('conn-dot', state)} aria-hidden="true" />
-      <span className="name">{connection.name}</span>
+      <span className="name">{shown}</span>
     </button>
   )
 }
@@ -158,9 +167,9 @@ function Banners() {
   if (health.signedOut)
     return (
       <div className="banner calm" role="status">
-        The bot is not signed in to the broker.
+        No trading account on this device: markets and backtests work, trading needs one.
         <button type="button" className="link" onClick={() => navigate('/account')}>
-          Sign it in
+          Add a trading account
         </button>
       </div>
     )

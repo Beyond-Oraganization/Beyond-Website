@@ -86,8 +86,8 @@ function Checked({ status, onDone }: { status: StatusReading | null; onDone: () 
           <dd>{status.version ?? '–'}</dd>
           <dt>Database</dt>
           <dd>{status.database.text}</dd>
-          <dt>Signed in as</dt>
-          <dd>{status.user ?? 'nobody yet'}</dd>
+          <dt>Trading account</dt>
+          <dd>{status.user ?? 'none yet on this device'}</dd>
           <dt>Broker</dt>
           <dd>{status.broker.text}</dd>
           <dt>Trading</dt>
@@ -99,7 +99,7 @@ function Checked({ status, onDone }: { status: StatusReading | null; onDone: () 
       <div className="btn-row">
         {status && !status.user ? (
           <Link to="/account" className="btn btn-solid" onClick={onDone}>
-            Sign the bot in
+            Add a trading account
           </Link>
         ) : (
           <Link to="/" className="btn btn-solid" onClick={onDone}>

@@ -2,13 +2,16 @@
 // The mock bot's HTTP side: the same contract as the real `beyondbot serve` (Api/CommandApi.cs, CommandRunner.cs).
 // POST / with a Bearer key (401 otherwise), a body of at most 4,096 bytes (413), a command line or {"command"} or
 // {"args"}; 400 for refused commands; one command at a time; CORS only for the listed origins (preflight without a
-// key); a client that disconnects cancels its own command.
+// key); a client that disconnects cancels its own command. Bot connections (Api/ApiConnections.cs): a request
+// without X-BeyondBot-Connection reaches no account; the login that creates a connection answers with its token in
+// `connection`; an unknown token, or an X-BeyondBot-Account the connection does not hold, is 403.
 //
 //   node mock-bot/server.mjs [--port 8443] [--speed 60] [--signed-out] [--ordering-bug] [--add-delay 3500]
 //   MOCK_BOT_KEY (default below), MOCK_BOT_ORIGINS ("*" = any localhost origin, or a comma list)
 //
 // Test control (no key, only with --control): POST /__mock/reset, /__mock/advance?ms=3600000, /__mock/config
 import http from 'node:http'
+import { randomBytes } from 'node:crypto'
 import { createBot } from './bot.mjs'
 
 export const DEFAULT_KEY = 'mock-bot-key-0123456789abcdef0123456789abcdef'
@@ -46,6 +49,8 @@ const refused = (command, error) => ({ command, exitCode: 2, elapsedMs: 0, outpu
 export function startServer({ port = 8443, key = DEFAULT_KEY, origins = '*', control = false, log = false, botOptions = {} } = {}) {
   let bot = createBot(botOptions)
   let gate = Promise.resolve()
+  // Token → { accounts, current }: each app's connection and the accounts it signed in to.
+  let connections = new Map()
   const allowed = (origin) => {
     if (!origin) return false
     if (origins === '*') return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
@@ -64,6 +69,7 @@ export function startServer({ port = 8443, key = DEFAULT_KEY, origins = '*', con
       res.setHeader('Content-Type', 'application/json')
       if (url.pathname === '/__mock/reset') {
         bot.stop()
+        connections = new Map()
         const given = Object.fromEntries(url.searchParams)
         const flag = (name) => (name in given ? given[name] === '1' || given[name] === 'true' : botOptions[name])
         const number = (name) => (name in given ? Number(given[name]) : botOptions[name])
@@ -89,7 +95,7 @@ export function startServer({ port = 8443, key = DEFAULT_KEY, origins = '*', con
       // A browser's preflight carries no key; only allowed origins get CORS headers.
       if (allowed(origin)) {
         res.setHeader('Access-Control-Allow-Methods', 'POST')
-        res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+        res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-BeyondBot-Connection, X-BeyondBot-Account')
       }
       res.statusCode = 204
       return res.end()
@@ -140,6 +146,19 @@ export function startServer({ port = 8443, key = DEFAULT_KEY, origins = '*', con
         return res.end(JSON.stringify(refused(describe(args), no)))
       }
 
+      const token = String(req.headers['x-beyondbot-connection'] ?? '').trim() || null
+      const picked = String(req.headers['x-beyondbot-account'] ?? '').trim() || null
+      const connection = token ? connections.get(token) : { accounts: [], current: null }
+      if (!connection) {
+        res.statusCode = 403
+        return res.end(JSON.stringify(refused(describe(args), { message: 'This connection has expired or is unknown; log in again.', hint: 'Send login without X-BeyondBot-Connection to start a new connection.' })))
+      }
+      const account = picked ? connection.accounts.find((login) => login.toLowerCase() === picked.toLowerCase()) : null
+      if (picked && !account) {
+        res.statusCode = 403
+        return res.end(JSON.stringify(refused(describe(args), { message: `This connection is not signed in to '${picked}'.`, hint: `Sign in to it first: login ${picked}` })))
+      }
+
       const controller = new AbortController()
       res.on('close', () => {
         if (!res.writableEnded) controller.abort()
@@ -147,14 +166,20 @@ export function startServer({ port = 8443, key = DEFAULT_KEY, origins = '*', con
       const run = gate.then(async () => {
         if (controller.signal.aborted) return null
         const started = performance.now()
-        const result = await bot.run(args, { signal: controller.signal })
+        const result = await bot.run(args, { signal: controller.signal, connection, account })
         return { result, elapsedMs: Math.round(performance.now() - started) }
       })
       gate = run.catch(() => {})
       const done = await run
       if (!done) return
       const { result, elapsedMs } = done
-      const answer = { command: describe(args), exitCode: result.exitCode, elapsedMs, output: result.output, blocks: result.blocks, error: result.error, json: result.json ?? null, ok: result.exitCode === 0 }
+      // A new connection that signed in gets its token, once; one that did not is forgotten.
+      let issued = null
+      if (!token && connection.accounts.length) {
+        issued = randomBytes(32).toString('base64url')
+        connections.set(issued, connection)
+      }
+      const answer = { command: describe(args), exitCode: result.exitCode, elapsedMs, output: result.output, blocks: result.blocks, error: result.error, json: result.json ?? null, ok: result.exitCode === 0, account: result.account ?? null, connection: issued }
       if (log) console.log(`API: ${answer.command} → exit code ${answer.exitCode} in ${elapsedMs} ms`)
       if (!res.writableEnded) res.end(JSON.stringify(answer))
     })
