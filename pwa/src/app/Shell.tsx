@@ -1,3 +1,4 @@
+import { LockBot } from '../components/LockBot.tsx'
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useRegisterSW } from 'virtual:pwa-register/react'
@@ -57,6 +58,8 @@ function Header() {
   const { offerable } = useInstall()
   const ui = useUi()
   const navigate = useNavigate()
+  const { connection, ready } = useBot()
+  const [locking, setLocking] = useState(false)
   return (
     <header className="hdr">
       <div className="hdr-in">
@@ -75,9 +78,11 @@ function Header() {
           <ConnectionChip />
           {offerable ? <IconButton icon="install" label="Install" showLabel onClick={() => ui.set({ installOpen: true })} /> : null}
           <IconButton icon="sun" label="Light theme" showLabel aria-pressed={theme === 'light'} onClick={toggle} />
+          {connection && ready ? <IconButton icon="lock" label="Lock the bot" className="desktop-only" onClick={() => setLocking(true)} /> : null}
           <IconButton icon="settings" label="Settings" className="desktop-only" onClick={() => navigate('/settings')} />
         </div>
       </div>
+      <LockBot open={locking} onClose={() => setLocking(false)} />
     </header>
   )
 }
@@ -104,18 +109,35 @@ function BottomNav() {
 
 function MoreSheet() {
   const ui = useUi()
+  const { connection, ready } = useBot()
+  const [locking, setLocking] = useState(false)
   const close = () => ui.set({ moreOpen: false })
   return (
-    <Sheet open={ui.moreOpen} onClose={close} title="More">
-      <nav aria-label="More screens" className="menu-list">
-        {MORE.map((item) => (
-          <NavLink key={item.to} to={item.to} onClick={close}>
-            <Icon name={item.icon} />
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
-    </Sheet>
+    <>
+      <Sheet open={ui.moreOpen} onClose={close} title="More">
+        <nav aria-label="More screens" className="menu-list">
+          {MORE.map((item) => (
+            <NavLink key={item.to} to={item.to} onClick={close}>
+              <Icon name={item.icon} />
+              {item.label}
+            </NavLink>
+          ))}
+          {connection && ready ? (
+            <button
+              type="button"
+              onClick={() => {
+                close()
+                setLocking(true)
+              }}
+            >
+              <Icon name="lock" />
+              Lock the bot
+            </button>
+          ) : null}
+        </nav>
+      </Sheet>
+      <LockBot open={locking} onClose={() => setLocking(false)} />
+    </>
   )
 }
 
@@ -233,7 +255,11 @@ function Unlock() {
           Unlock {connection.name}.
         </h1>
         <p className="lead on-band">
-          {asksKey ? 'This device does not keep the API key for this bot. Paste it to connect for this visit.' : 'The API key is sealed on this device. Your passphrase opens it.'}
+          {asksKey
+            ? 'This device does not keep the API key for this bot. Paste it to connect for this visit.'
+            : connection.relock
+              ? 'You locked this bot. The passphrase you chose opens it; it is then remembered on this device again.'
+              : 'The API key is sealed on this device. Your passphrase opens it.'}
         </p>
         <form className="form" style={{ marginTop: 28 }} onSubmit={submit}>
           <Field id={id} label={asksKey ? 'API key' : 'Passphrase'} error={error}>

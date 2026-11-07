@@ -1,3 +1,4 @@
+import { sessionName } from '../api/session.ts'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { useAction, useCommand } from '../api/bot.ts'
@@ -177,8 +178,8 @@ function Strategies({ snapshot, offset }: { snapshot: SessionSnapshot; offset: n
           {snapshot.strategies.map((session) => {
             const next = parseIso(session.nextTickAt)
             return (
-              <Link key={marketLabel(session.market)} to="/trading" className="tile">
-                <span className="label mute">{session.strategy}</span>
+              <Link key={`${sessionName(session)} ${marketLabel(session.market)}`} to="/trading" className="tile">
+                <span className="label mute">{sessionName(session) === session.strategy ? session.strategy : `${sessionName(session)} · ${session.strategy}`}</span>
                 <span className="h3">{marketLabel(session.market)}</span>
                 <span className="mono small">Last signal: {lastSignalWords(session.lastTick)}</span>
                 <span className="mono small">

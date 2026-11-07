@@ -114,9 +114,21 @@ export const cmd = {
     ...(to != null ? ['--to', utcArg(to)] : []),
   ],
 
-  /** On a live account, `live` confirms trading real money (--live) after the app's own confirmation. */
-  tradingStart: (input: StrategyInput, live = false) => ['trading', 'start', ...strategyArgs(input), ...(live ? ['--live'] : [])],
+  /**
+   * Starts a strategy session. `name` names it (several can trade one market; a running session of that name is
+   * replaced); without one the bot names it after the strategy. On a live account, `live` confirms trading real
+   * money (--live) after the app's own confirmation.
+   */
+  tradingStart: (input: StrategyInput, live = false, name?: string | null) => [
+    'trading',
+    'start',
+    ...strategyArgs(input),
+    ...(name ? ['--name', name] : []),
+    ...(live ? ['--live'] : []),
+  ],
   tradingStop: (symbol?: string, interval?: string) => ['trading', 'stop', ...(symbol ? [symbol] : []), ...(symbol && interval ? [interval] : [])],
+  /** Stops one session by name. */
+  tradingStopSession: (name: string) => ['trading', 'stop', '--name', name],
   tradingStatus: () => ['trading', 'status'],
 
   ordersList: ({ broker = false, symbol }: { broker?: boolean; symbol?: string | null } = {}) => [

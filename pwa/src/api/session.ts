@@ -2,6 +2,12 @@ import { z } from 'zod'
 import type { CommandResult, SessionSnapshot } from './types.ts'
 import { parsed, unreadable, type Parsed } from './parse/blocks.ts'
 
+/** A session's name: its own, or the strategy's for a bot from before names (one session per market). */
+export const sessionName = (session: { name?: string; strategy: string }) => session.name ?? session.strategy
+
+/** What the bot accepts as a session name (TradingSupervisor.ValidName): 1 to 40 letters, digits, spaces, '.', '_', '-'. */
+export const SESSION_NAME = /^[\p{L}\p{N} ._-]{1,40}$/u
+
 // The CSP allows no eval. Without this, zod probes for it with `new Function('')` when it builds an object
 // schema, which the browser reports as a CSP violation even though zod catches the error.
 z.config({ jitless: true })
@@ -78,6 +84,8 @@ export const SessionSchema = z.object({
   }),
   strategies: z.array(
     z.object({
+      // The session's name: several sessions can trade one market. A bot from before names sends none.
+      name: str.optional(),
       market,
       strategy: str,
       parameters: z.record(z.string(), num),
