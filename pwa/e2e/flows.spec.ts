@@ -145,6 +145,45 @@ test('stops and starts trading, each after a confirmation', async ({ page }) => 
   await expect(page.getByRole('heading', { name: '1 strategy trading.' })).toBeVisible()
 })
 
+test('two named sessions trade one market, and one stops by its name', async ({ page }) => {
+  await connected(page)
+  await page.goto('#/trading')
+  await expect(page.getByRole('heading', { name: '1 strategy trading.' })).toBeVisible()
+  await page.getByLabel('Session name (optional)').fill('variant 2')
+  await expect(page.getByText(/already traded by “drcs”/)).toBeVisible()
+  await page.getByRole('button', { name: 'Start trading' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Start trading' }).click()
+  await expect(page.getByRole('heading', { name: '2 strategies trading.' })).toBeVisible()
+  const card = page.locator('li', { hasText: 'variant 2 · drcs' })
+  await card.getByRole('button', { name: 'Stop', exact: true }).click()
+  await expect(page.getByRole('dialog').getByRole('heading', { name: 'Stop “variant 2”?' })).toBeVisible()
+  await page.getByRole('dialog').getByRole('button', { name: 'Stop', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '1 strategy trading.' })).toBeVisible()
+})
+
+test('remember me opens the bot after a reload; locking it asks for the chosen passphrase, then remembers it again', async ({ page }) => {
+  await connected(page)
+  await page.reload()
+  await expect(page.getByText('Equity', { exact: true })).toBeVisible()
+  const lockButton = page.getByRole('button', { name: 'Lock the bot' })
+  if (await lockButton.filter({ visible: true }).count()) await lockButton.filter({ visible: true }).first().click()
+  else {
+    await page.getByRole('button', { name: 'More' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Lock the bot' }).click()
+  }
+  await page.getByLabel('Passphrase', { exact: true }).fill('correct horse battery')
+  await page.getByLabel('Passphrase again').fill('correct horse battery')
+  await page.getByRole('dialog').getByRole('button', { name: 'Lock the bot' }).click()
+  await expect(page.getByRole('heading', { name: 'Unlock Mock bot.' })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Unlock Mock bot.' })).toBeVisible()
+  await page.getByLabel('Passphrase').fill('correct horse battery')
+  await page.getByRole('button', { name: 'Unlock' }).click()
+  await expect(page.getByText('Equity', { exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.getByText('Equity', { exact: true })).toBeVisible()
+})
+
 test('places a market order after review, then closes it', async ({ page }) => {
   await connected(page)
   await page.goto('#/orders')

@@ -11,7 +11,7 @@ import { fmtTime } from '../format.ts'
 import { useConnections, type Connection, type KeyStorage } from '../state/connections.ts'
 import { passphraseProblem } from '../state/vault.ts'
 
-const STORAGE: Record<KeyStorage, string> = { passphrase: 'Key under a passphrase', device: 'Key kept on this device', session: 'Key not kept' }
+const STORAGE: Record<KeyStorage, string> = { passphrase: 'Key under a passphrase', device: 'Remembered on this device', session: 'Key not kept' }
 
 function EditSheet({ connection, onClose }: { connection: Connection; onClose: () => void }) {
   const { update, replaceKey } = useConnections()
@@ -88,7 +88,7 @@ function EditSheet({ connection, onClose }: { connection: Connection; onClose: (
 }
 
 export default function Connections() {
-  const { connections, activeId, keys, setActive, remove, lock } = useConnections()
+  const { connections, activeId, keys, setActive, remove, lock, remember } = useConnections()
   const health = useHealth((state) => state.byId)
   const [editing, setEditing] = useState<Connection | null>(null)
   const [forgetting, setForgetting] = useState<Connection | null>(null)
@@ -126,7 +126,7 @@ export default function Connections() {
                       <p className="mono small">{connection.url}</p>
                       <div className="pills">
                         {connection.id === activeId ? <Pill tone="solid">In use</Pill> : null}
-                        <Pill>{STORAGE[connection.storage]}</Pill>
+                        <Pill>{connection.relock ? 'Locked by you' : STORAGE[connection.storage]}</Pill>
                         {keys[connection.id] ? <Pill>Unlocked</Pill> : <Pill>Locked</Pill>}
                         {state?.unauthorized ? <Pill tone="accent">Key refused</Pill> : state?.unreachable ? <Pill tone="accent">Unreachable</Pill> : null}
                       </div>
@@ -136,6 +136,17 @@ export default function Connections() {
                       {connection.id !== activeId ? (
                         <Button compact onClick={() => void setActive(connection.id)}>
                           Use
+                        </Button>
+                      ) : null}
+                      {keys[connection.id] && connection.storage !== 'device' ? (
+                        <Button
+                          compact
+                          variant="ghost"
+                          onClick={() =>
+                            void remember(connection.id).then(() => toast.success('Remembered', `${connection.name} opens without a passphrase on this device. More → Lock the bot locks it.`))
+                          }
+                        >
+                          Remember me
                         </Button>
                       ) : null}
                       <Button compact variant="ghost" onClick={() => setEditing(connection)}>

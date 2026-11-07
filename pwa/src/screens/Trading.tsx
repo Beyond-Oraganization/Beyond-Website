@@ -1,3 +1,6 @@
+import type { ChangeEvent } from 'react'
+import { TextField } from '../components/Field.tsx'
+import { SESSION_NAME, sessionName } from '../api/session.ts'
 import { useAccounts } from '../hooks/accounts.ts'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
@@ -35,7 +38,7 @@ function SessionCard({ session, offset, onStop }: { session: TradingSessionState
     <li className="box stack-sm">
       <div className="spread">
         <div>
-          <p className="label mute">{session.strategy}</p>
+          <p className="label mute">{sessionName(session) === session.strategy ? session.strategy : `${sessionName(session)} · ${session.strategy}`}</p>
           <p className="h2">{marketLabel(session.market)}</p>
         </div>
         <div className="btn-row">
@@ -145,7 +148,15 @@ function StartForm({ running }: { running: TradingSessionState[] }) {
   const definition = definitions?.find((d) => d.name === draft?.strategy)
   const errors = useMemo(() => (draft ? validateConfig(draft, definition) : {}), [draft, definition])
   const valid = Object.keys(errors).length === 0
-  const replacing = draft ? running.some((s) => marketLabel(s.market) === draft.market) : false
+  // Several sessions can trade one market, each under a name; the same name replaces its session. A bot from
+  // before names runs one session per market, which starting again replaces.
+  const [name, setName] = useState('')
+  const named = running.some((s) => s.name != null)
+  const typedName = name.trim()
+  const nameError = typedName && !SESSION_NAME.test(typedName) ? "1 to 40 letters, digits, spaces, '.', '_' or '-'." : null
+  const sameMarket = draft ? running.filter((s) => marketLabel(s.market) === draft.market) : []
+  const replaced = named ? running.find((s) => typedName && sessionName(s).toLowerCase() === typedName.toLowerCase()) : sameMarket[0]
+  const replacing = replaced != null
   // A LIVE account trades real money: the bot starts it only with --live, sent after this confirmation.
   const { current } = useAccounts()
   const live = current?.live ?? false
@@ -176,16 +187,33 @@ function StartForm({ running }: { running: TradingSessionState[] }) {
       onSubmit={(event) => {
         event.preventDefault()
         setTouched(true)
-        if (valid) setConfirming(true)
+        if (valid && !nameError) setConfirming(true)
       }}
     >
       <StrategyForm definitions={definitions} markets={marketRows} config={draft} onChange={(next) => {
         setDraft(next)
         setPreview(null)
       }} errors={touched ? errors : {}} />
+      {named ? (
+        <TextField
+          id="t-session-name"
+          label="Session name (optional)"
+          registration={{ name: 'session-name', value: name, onChange: (event: ChangeEvent<HTMLInputElement>) => setName(event.target.value) }}
+          error={nameError ?? undefined}
+          hint="Several sessions can trade one market, e.g. two variants of drcs on EURPLN 1h; each closes only its own positions. The same name replaces that session; left empty, the bot names it (drcs, drcs 2, …)."
+        />
+      ) : null}
       {replacing ? (
         <Callout label="Already trading" tone="warn">
-          <p>{draft.market} is being traded. Starting again replaces that session with these settings.</p>
+          <p>
+            {named ? `“${sessionName(replaced)}” is running (${marketLabel(replaced.market)}).` : `${draft.market} is being traded.`} Starting replaces that session with these settings.
+          </p>
+        </Callout>
+      ) : named && sameMarket.length ? (
+        <Callout label="Beside the others">
+          <p>
+            {draft.market} is already traded by {sameMarket.map((s) => `“${sessionName(s)}”`).join(', ')}. This starts another session beside {sameMarket.length === 1 ? 'it' : 'them'}.
+          </p>
         </Callout>
       ) : null}
       <div className="btn-row">
@@ -209,16 +237,17 @@ function StartForm({ running }: { running: TradingSessionState[] }) {
         }
         danger={live}
         review={[
+          ...(named ? [['Session', typedName || 'named by the bot'] as [string, string]] : []),
           ...(current ? [['Account', `${current.login}, ${current.broker.toLowerCase() === 'bybit' ? 'Bybit' : 'cTrader'} ${current.live ? 'LIVE' : 'DEMO'}`] as [string, string]] : []),
           ['Strategy', `${definition?.name} – ${definition?.title}`],
           ['Market', draft.market],
           ['Parameters', describeParams(input)],
           ...(input.rules?.length ? [['Rules, in order', <ol key="rules" className="rule-list mono">{input.rules.map((rule, index) => <li key={index}>{rule}</li>)}</ol>] as [string, ReactNode]] : []),
-          ...(replacing ? [['Replaces', 'the session trading this market now'] as [string, string]] : []),
+          ...(replacing ? [['Replaces', named ? `“${sessionName(replaced)}”` : 'the session trading this market now'] as [string, string]] : []),
         ]}
         confirmLabel={live ? 'Start with real money' : replacing ? 'Replace and start' : 'Start trading'}
         onConfirm={async () => {
-          const answer = await run(cmd.tradingStart(input, live), { invalidate: ['markets'] })
+          const answer = await run(cmd.tradingStart(input, live, named ? typedName || null : null), { invalidate: ['markets'] })
           const { done } = notices(answer)
           toast.success('Trading', done[0] ?? `${draft.market} with ${draft.strategy}`)
           const reading = parseSignal(answer)
@@ -260,7 +289,7 @@ export default function Trading() {
             value.strategies.length ? (
               <ul className="tiles" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,420px),1fr))' }}>
                 {value.strategies.map((s) => (
-                  <SessionCard key={marketLabel(s.market)} session={s} offset={offset} onStop={() => setStopping(s)} />
+                  <SessionCard key={`${sessionName(s)} ${marketLabel(s.market)}`} session={s} offset={offset} onStop={() => setStopping(s)} />
                 ))}
               </ul>
             ) : (
@@ -300,15 +329,20 @@ export default function Trading() {
       <ConfirmSheet
         open={stopping !== null}
         onClose={() => setStopping(null)}
-        title={stopping === 'all' ? `Stop all ${running.length} strategies?` : `Stop ${stopping ? marketLabel(stopping.market) : ''}?`}
+        title={stopping === 'all' ? `Stop all ${running.length} strategies?` : `Stop ${stopping ? (stopping.name ? `“${stopping.name}”` : marketLabel(stopping.market)) : ''}?`}
         intro="Each stops after its tick in progress. Open positions stay open at the broker."
-        review={stopping && stopping !== 'all' ? [['Strategy', stopping.strategy], ['Market', marketLabel(stopping.market)], ['Trades so far', plural(stopping.trades, 'trade')]] : running.map((s) => ['Market', `${marketLabel(s.market)} (${s.strategy})`] as [string, string])}
+        review={
+          stopping && stopping !== 'all'
+            ? [['Session', sessionName(stopping)], ['Strategy', stopping.strategy], ['Market', marketLabel(stopping.market)], ['Trades so far', plural(stopping.trades, 'trade')]]
+            : running.map((s) => ['Session', `${sessionName(s)}: ${marketLabel(s.market)} (${s.strategy})`] as [string, string])
+        }
         confirmLabel="Stop"
         danger
         onConfirm={async () => {
           if (!stopping) return
           const [symbol, interval] = stopping === 'all' ? [] : marketLabel(stopping.market).split(' ')
-          const answer = await run(cmd.tradingStop(symbol, interval), { invalidate: ['markets'] })
+          // One named session by its name: the others on its market keep trading.
+          const answer = await run(stopping !== 'all' && stopping.name ? cmd.tradingStopSession(stopping.name) : cmd.tradingStop(symbol, interval), { invalidate: ['markets'] })
           toast.info('Stopped', notices(answer).done.join(' ') || 'Trading stopped.')
         }}
       />

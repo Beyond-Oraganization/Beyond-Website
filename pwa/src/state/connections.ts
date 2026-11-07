@@ -3,7 +3,10 @@ import { useShallow } from 'zustand/react/shallow'
 import { db } from './db.ts'
 import { seal, unseal, type Sealed } from './vault.ts'
 
-/** How the API key is kept: sealed under a passphrase (default), sealed with a device key, or not at all. */
+/**
+ * How the API key is kept: sealed under a passphrase, sealed with a device key ("remember me": the bot opens
+ * without asking), or not at all.
+ */
 export type KeyStorage = 'passphrase' | 'device' | 'session'
 
 export type Connection = {
@@ -15,6 +18,8 @@ export type Connection = {
   addedAt: number
   lastOkAt?: number
   botVersion?: string | null
+  /** Locked with "Lock the bot" while remembered: unlocking with the passphrase remembers it again. */
+  relock?: boolean
 }
 
 type Saved = { connections: Connection[]; activeId: string | null; tokens?: Record<string, string> }
@@ -39,6 +44,13 @@ type ConnectionState = Saved & {
   unlock: (id: string, passphrase: string) => Promise<void>
   enterKey: (id: string, key: string) => void
   lock: () => void
+  /**
+   * Locks one bot. A remembered bot gets its key sealed under `passphrase` until it is unlocked with it (then it
+   * is remembered again); a bot kept with a passphrase (`passphrase` null) or not kept only forgets the key.
+   */
+  lockWith: (id: string, passphrase: string | null) => Promise<void>
+  /** Remember me: keeps the open key with the device key, so the bot opens without a passphrase. */
+  remember: (id: string) => Promise<void>
 }
 
 const SAVED = 'connections'
@@ -131,6 +143,30 @@ export const useConnections = create<ConnectionState>((set, get) => {
       if (!connection?.sealed) throw new Error('This connection has no stored key.')
       const key = await unseal(id, connection.sealed, passphrase)
       set({ keys: { ...get().keys, [id]: key } })
+      // Locked from "remember me": remember it again.
+      if (connection.relock) await get().remember(id)
+    },
+
+    async lockWith(id, passphrase) {
+      const connection = get().connections.find((c) => c.id === id)
+      const key = get().keys[id]
+      if (!connection) return
+      if (connection.storage === 'device' && key && passphrase != null) {
+        const sealed = await seal(id, key, passphrase)
+        set({ connections: get().connections.map((c) => (c.id === id ? { ...c, storage: 'passphrase', sealed, relock: true } : c)) })
+        await save()
+      }
+      const keys = { ...get().keys }
+      delete keys[id]
+      set({ keys })
+    },
+
+    async remember(id) {
+      const key = get().keys[id]
+      if (!key) throw new Error('Unlock this bot first.')
+      const sealed = await seal(id, key, null)
+      set({ connections: get().connections.map((c) => (c.id === id ? { ...c, storage: 'device', sealed, relock: false } : c)) })
+      await save()
     },
 
     enterKey(id, key) {

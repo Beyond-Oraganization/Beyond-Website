@@ -151,6 +151,8 @@ export type TickReport = {
 }
 
 export type TradingSessionState = {
+  /** The session's name (several can trade one market); a bot from before names sends none: use `sessionName`. */
+  name?: string
   market: MarketIdJson
   strategy: string
   parameters: Record<string, number>

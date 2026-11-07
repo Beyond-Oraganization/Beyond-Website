@@ -117,7 +117,10 @@ export default function Connect() {
   const add = useConnections((state) => state.add)
   const navigate = useNavigate()
   const [skipInstall, setSkipInstall] = useState(false)
-  const [storage, setStorage] = useState<KeyStorage>('passphrase')
+  // Remember me keeps the key with the device key; otherwise a passphrase seals it, or it is not kept at all.
+  const [remember, setRemember] = useState(false)
+  const [kept, setKept] = useState<Exclude<KeyStorage, 'device'>>('passphrase')
+  const storage: KeyStorage = remember ? 'device' : kept
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [status, setStatus] = useState<StatusReading | null>(null)
   const [connected, setConnected] = useState(false)
@@ -203,24 +206,29 @@ export default function Connect() {
               registration={register('key', { required: 'Paste the API key.', validate: (value) => value.trim().length >= 32 || 'The API key has at least 32 characters.' })}
             />
             <TextField id="c-name" label="Name (optional)" hint="Shown in the header, e.g. “Gold VM”." registration={register('name')} />
-            <Segmented
-              name="storage"
-              legend="Keep the key on this device"
-              value={storage}
-              onChange={setStorage}
-              options={[
-                { value: 'passphrase', label: 'With a passphrase' },
-                { value: 'device', label: 'Without' },
-                { value: 'session', label: 'Don’t keep it' },
-              ]}
-              hint={
-                storage === 'passphrase'
-                  ? 'Recommended. The key is encrypted; you type the passphrase when the app starts or after it locks.'
-                  : storage === 'device'
-                    ? 'The key is encrypted with a key of this device only. Other pages on beyond-oraganization.github.io could still use it: choose this only on a device that is yours alone.'
-                    : 'You paste the key every time you open the app.'
-              }
-            />
+            <div className="field">
+              <label className="check">
+                <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /> Remember me on this device
+              </label>
+              <p className="hint">
+                {remember
+                  ? 'The app opens straight to the bot, without a passphrase. The key is encrypted with a key of this device only; other pages on beyond-oraganization.github.io could still use it, so choose this only on a device that is yours alone. “Lock the bot” (in More) locks it whenever you want.'
+                  : 'Without it, the key is kept under a passphrase you type when the app starts or after it locks, or not kept at all.'}
+              </p>
+            </div>
+            {remember ? null : (
+              <Segmented
+                name="storage"
+                legend="Keep the key on this device"
+                value={kept}
+                onChange={setKept}
+                options={[
+                  { value: 'passphrase', label: 'With a passphrase' },
+                  { value: 'session', label: 'Don’t keep it' },
+                ]}
+                hint={kept === 'passphrase' ? 'The key is encrypted; you type the passphrase when the app starts or after it locks.' : 'You paste the key every time you open the app.'}
+              />
+            )}
             {storage === 'passphrase' ? (
               <div className="form-grid">
                 <TextField

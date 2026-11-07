@@ -30,7 +30,7 @@ export async function connect(page: Page, { key = KEY, url = BOT } = {}) {
   await page.getByLabel('Address').fill(url)
   await page.getByLabel('API key').fill(key)
   await page.getByLabel('Name (optional)').fill('Mock bot')
-  await page.getByLabel('Without').check()
+  await page.getByLabel('Remember me on this device').check()
   await page.getByRole('button', { name: 'Check and connect' }).click()
 }
 

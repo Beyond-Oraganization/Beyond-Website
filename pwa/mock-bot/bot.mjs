@@ -453,10 +453,10 @@ export function createBot(options = {}) {
         user: s.user, startedAt: new Date(s.loginAt).toISOString(), uptime: F.span(t - s.loginAt), startBalance: s.stats.startBalance,
         tradesOpened: s.stats.tradesOpened, tradesClosed: s.stats.tradesClosed, realizedProfit: s.stats.realizedProfit, wins: s.stats.wins, losses: s.stats.losses,
       },
-      strategies: [...s.sessions.values()].sort((a, b) => a.key.localeCompare(b.key)).map((x) => {
+      strategies: [...s.sessions.values()].sort((a, b) => a.key.localeCompare(b.key) || a.startedAt - b.startedAt).map((x) => {
         const m = s.markets.get(x.key)
         return {
-          market: { symbol: m.symbol, interval: m.interval.name }, strategy: 'drcs', parameters: x.params, rules: x.rules.map((r) => r.text), startedAt: new Date(x.startedAt).toISOString(),
+          name: x.name, market: { symbol: m.symbol, interval: m.interval.name }, strategy: 'drcs', parameters: x.params, rules: x.rules.map((r) => r.text), startedAt: new Date(x.startedAt).toISOString(),
           ticks: x.ticks, trades: x.trades, lastTick: x.lastTick, lastError: x.lastError, lastErrorAt: x.lastErrorAt, nextTickAt: new Date(nextBoundary(m.interval.ms)).toISOString(),
         }
       }),
@@ -745,7 +745,7 @@ export function createBot(options = {}) {
       const t = now()
       o.table(['Symbol', 'Interval', 'Candles', 'First', 'Newest', 'Age', 'Trading'], [...s.markets.values()].sort((a, b) => a.symbol.localeCompare(b.symbol) || a.interval.ms - b.interval.ms).map((m) => [
         m.symbol, m.interval.code, F.count(m.candles.length), F.time(m.candles[0]?.openTime), F.time(m.candles.at(-1)?.openTime),
-        m.candles.length ? F.duration((t - m.candles.at(-1).closeTime) / 1000) : '–', s.sessions.has(keyOf(m.symbol, m.interval.code)) ? 'yes' : '',
+        m.candles.length ? F.duration((t - m.candles.at(-1).closeTime) / 1000) : '–', [...s.sessions.values()].some((x) => x.key === keyOf(m.symbol, m.interval.code)) ? 'yes' : '',
       ]))
     },
     'market add': async (o, argv, _, signal) => {
@@ -795,7 +795,7 @@ export function createBot(options = {}) {
         o.text(`Nothing stored for ${pos[0]} ${pos[1] ?? ''}.`)
         return 1
       }
-      if (targets.some((m) => s.sessions.has(keyOf(m.symbol, m.interval.code)))) throw new Exit(1, `That market is being traded. Stop it first with: trading stop ${symbol}`)
+      if (targets.some((m) => [...s.sessions.values()].some((x) => x.key === keyOf(m.symbol, m.interval.code)))) throw new Exit(1, `That market is being traded. Stop it first with: trading stop ${symbol}`)
       const candles = targets.reduce((sum, m) => sum + m.candles.length, 0)
       if (!opt.yes) throw new Exit(1, `Delete ${targets.map((m) => `${m.symbol} ${m.interval.code}`).join(', ')} and its ${F.count(candles)} candles? Pass --yes to confirm without being asked.`)
       for (const m of targets) {
@@ -903,34 +903,44 @@ export function createBot(options = {}) {
       o.text(describeParams(input.params, input.rules))
     },
     'trading start': (o, argv) => {
-      const input = strategyInput(argv, { '--live': {} })
+      const input = strategyInput(argv, { '--live': {}, '--name': { alias: '-n', value: true } })
       requireLogin()
       if (users.get(s.user.toLowerCase())?.mode === 'Live' && !input.opt.live)
         throw new Exit(1, `'${s.user}' is a LIVE ${users.get(s.user.toLowerCase()).broker} account: this strategy trades real money. Start it? Pass --live to confirm without being asked.`)
       const market = marketOrFail(input.symbol, input.interval)
       o.text(`Starting drcs on ${market.symbol} ${market.interval.code}…`)
       const key = keyOf(market.symbol, market.interval.code)
-      const session = { key, params: input.params, rules: input.rules, startedAt: now(), ticks: 0, trades: 0, lastTick: null, lastError: null, lastErrorAt: null, evaluated: -1, positions: [], nextTickAt: nextBoundary(market.interval.ms) }
+      // Sessions by name (TradingSupervisor): the same name replaces; none gives drcs, drcs 2, …
+      const given = input.opt.name?.trim()
+      if (given !== undefined && !/^[\p{L}\p{N} ._-]{1,40}$/u.test(given))
+        throw new Exit(1, `'${input.opt.name}' is not a session name: use 1 to 40 letters, digits, spaces, '.', '_' or '-'.`)
+      const taken = (n) => [...s.sessions.keys()].some((k) => k.toLowerCase() === n.toLowerCase())
+      let name = given
+      if (!name) for (let n = 1; !name; n++) if (!taken(n === 1 ? 'drcs' : `drcs ${n}`)) name = n === 1 ? 'drcs' : `drcs ${n}`
+      const replacing = [...s.sessions.keys()].find((k) => k.toLowerCase() === name.toLowerCase())
+      if (replacing) s.sessions.delete(replacing)
+      const session = { name, key, params: input.params, rules: input.rules, startedAt: now(), ticks: 0, trades: 0, lastTick: null, lastError: null, lastErrorAt: null, evaluated: -1, positions: [], nextTickAt: nextBoundary(market.interval.ms) }
       const preview = tick(session, true)
-      s.sessions.set(key, session)
+      s.sessions.set(name, session)
       insightPanel(o, market, preview)
-      o.text(`✓ Trading ${market.symbol} ${market.interval.code} with drcs on cTrader DEMO (${describeParams(input.params, input.rules)}).`)
+      o.text(`✓ ${replacing ? 'Replaced' : 'Started'} ${name}: trading ${market.symbol} ${market.interval.code} with drcs on cTrader DEMO (${describeParams(input.params, input.rules)}).`)
       o.text(`  The newest candle was only previewed; the first trade can come at the next close, ${F.hhmm(session.nextTickAt)} UTC. Each tick prints a line here.`)
     },
     'trading stop': (o, argv) => {
-      const { pos } = readArgs(argv)
+      const { pos, opt } = readArgs(argv, { '--name': { alias: '-n', value: true } })
       requireLogin()
       const symbol = pos[0]?.toUpperCase()
       const interval = pos[1] ? parseInterval(pos[1]) : null
-      const matching = [...s.sessions.values()].filter((x) => (!symbol || x.key.startsWith(`${symbol} `)) && (!interval || x.key.endsWith(` ${interval.code}`)))
+      const matching = [...s.sessions.values()].filter((x) => (!opt.name || x.name.toLowerCase() === opt.name.trim().toLowerCase())
+        && (!symbol || x.key.startsWith(`${symbol} `)) && (!interval || x.key.endsWith(` ${interval.code}`)))
       if (!matching.length) {
         o.text('No matching strategy is trading.')
         return 1
       }
       for (const x of matching) {
-        o.text(`Stopping ${x.key} after its tick in progress…`)
-        s.sessions.delete(x.key)
-        o.text(`✓ Stopped ${x.key} (drcs) after ${x.ticks} ticks and ${x.trades} trades.`)
+        o.text(`Stopping ${x.name} on ${x.key} after its tick in progress…`)
+        s.sessions.delete(x.name)
+        o.text(`✓ Stopped ${x.name} on ${x.key} (drcs) after ${x.ticks} ticks and ${x.trades} trades.`)
       }
     },
     'trading status': (o) => {
@@ -1038,10 +1048,10 @@ export function createBot(options = {}) {
     s.records.unshift({ orderId: '812301', symbol: 'XAUUSD', quantity: 2, price: round(xau.candles.at(-90).close, 2), status: 'None', type: 'Market', side: 'Buy', createdAt: xau.candles.at(-90).closeTime })
     if (options.trading !== false) {
       const startParams = params()
-      const session = { key: 'XAUUSD 1h', params: startParams, rules: rulesOf([], startParams), startedAt: now() - 5 * 3600e3 - 12 * 60e3, ticks: 5, trades: 1, lastTick: null, lastError: null, lastErrorAt: null, evaluated: -1, positions: [position.orderId], nextTickAt: nextBoundary(3600e3) }
+      const session = { name: 'drcs', key: 'XAUUSD 1h', params: startParams, rules: rulesOf([], startParams), startedAt: now() - 5 * 3600e3 - 12 * 60e3, ticks: 5, trades: 1, lastTick: null, lastError: null, lastErrorAt: null, evaluated: -1, positions: [position.orderId], nextTickAt: nextBoundary(3600e3) }
       tick(session, true)
       session.lastTick = { ...session.lastTick, outcome: 'Evaluated' }
-      s.sessions.set('XAUUSD 1h', session)
+      s.sessions.set('drcs', session)
     }
     s.loaded.add('XAUUSD 1h')
   }
