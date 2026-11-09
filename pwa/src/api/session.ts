@@ -17,7 +17,25 @@ const numOrNull = z.number().nullable()
 const str = z.string()
 const strOrNull = z.string().nullable()
 const market = z.object({ symbol: str, interval: str })
-const signal = z.object({ action: str, side: str, balanceShare: num })
+// A bot from before position sizing sends the share of the balance an open spends; one since sends none.
+const signal = z.object({ action: str, side: str, balanceShare: num.optional() })
+const kellyEstimate = z.object({
+  trades: num,
+  wins: num,
+  losses: num,
+  averageWin: num,
+  averageLoss: num,
+  winProbability: num,
+  lossProbability: num,
+  payoffRatio: numOrNull,
+  percent: numOrNull,
+  whyUnusable: strOrNull,
+})
+const sizing = z.object({
+  method: str,
+  value: num,
+  kelly: z.object({ estimate: kellyEstimate, shareOfKelly: num, backtestId: num, backtestedAt: str, from: str, to: str }).nullable(),
+})
 const insight = z.object({ signal, reason: str, values: z.array(z.object({ name: str, value: num, isLevel: z.boolean().optional() })) })
 const candle = z.object({ openTime: str, closeTime: str, open: num, high: num, low: num, close: num, volume: num })
 const order = z.object({ orderId: str, symbol: str, quantity: num, price: num, status: str, type: str, side: str, createdAt: str })
@@ -90,6 +108,8 @@ export const SessionSchema = z.object({
       strategy: str,
       parameters: z.record(z.string(), num),
       rules: z.array(str).optional(),
+      // How it sizes its positions; a bot from before position sizing sends none.
+      sizing: sizing.optional(),
       startedAt: str,
       ticks: num,
       trades: num,

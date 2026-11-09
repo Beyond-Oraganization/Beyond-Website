@@ -17,7 +17,7 @@ import { Decision } from '../components/Decision.tsx'
 import { ScreenHead } from '../components/ScreenHead.tsx'
 import { ConfirmSheet } from '../components/Sheet.tsx'
 import { StrategyForm } from '../components/StrategyForm.tsx'
-import { describeParams, initialConfig, toInput, validateConfig, type StrategyConfig } from '../strategy/config.ts'
+import { describeParams, describeSizing, initialConfig, toInput, validateConfig, type StrategyConfig } from '../strategy/config.ts'
 import { toast } from '../components/Toasts.tsx'
 import { Button, Callout, EmptyState, Pill, Section, Skeleton } from '../components/ui.tsx'
 import { fmtClock, fmtDuration, fmtElapsed, fmtHourMinute, fmtNumber, fmtPrice, fmtRelative } from '../format.ts'
@@ -25,7 +25,7 @@ import { useNow } from '../hooks/env.ts'
 import { useMarkets, useStrategies } from '../hooks/data.ts'
 import { clockOffset, useSessionData } from '../hooks/session.ts'
 import { type TickEntry, useLogs, useTicks } from '../state/logs.ts'
-import { lastSignalWords, levelsOf, outcomeWords, plural } from '../words.ts'
+import { kellyBasisWords, lastSignalWords, levelsOf, outcomeWords, plural, sizingWords } from '../words.ts'
 
 function SessionCard({ session, offset, onStop }: { session: TradingSessionState; offset: number; onStop: () => void }) {
   const now = useNow(1000) + offset
@@ -70,6 +70,11 @@ function SessionCard({ session, offset, onStop }: { session: TradingSessionState
         <dt>Running</dt>
         <dd>
           {fmtDuration((now - (parseIso(session.startedAt) ?? now)) / 1000)} · {plural(session.ticks, 'tick')} · {plural(session.trades, 'trade')}
+        </dd>
+        <dt>Sizing</dt>
+        <dd>
+          {sizingWords(session.sizing)}
+          {kellyBasisWords(session.sizing) ? <span className="mute"> · from {kellyBasisWords(session.sizing)}</span> : null}
         </dd>
         <dt>Last signal</dt>
         <dd>{lastSignalWords(tick)}</dd>
@@ -242,6 +247,7 @@ function StartForm({ running }: { running: TradingSessionState[] }) {
           ['Strategy', `${definition?.name} – ${definition?.title}`],
           ['Market', draft.market],
           ['Parameters', describeParams(input)],
+          ['Position sizing', describeSizing(input.sizing, definition?.sizing ?? null)],
           ...(input.rules?.length ? [['Rules, in order', <ol key="rules" className="rule-list mono">{input.rules.map((rule, index) => <li key={index}>{rule}</li>)}</ol>] as [string, ReactNode]] : []),
           ...(replacing ? [['Replaces', named ? `“${sessionName(replaced)}”` : 'the session trading this market now'] as [string, string]] : []),
         ]}

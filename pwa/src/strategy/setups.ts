@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { db } from '../state/db.ts'
-import type { StrategyConfig } from './config.ts'
+import type { SizingConfig, StrategyConfig } from './config.ts'
 
 /**
- * A named strategy setup kept on this device for one bot: the strategy, its parameters and its rules, without a
- * market, so one setup can trade or backtest any market. Applied with `applySetup`, which fits it to the catalog
- * as the bot describes it then.
+ * A named strategy setup kept on this device for one bot: the strategy, its parameters, its rules and its sizing
+ * (none in a setup saved before sizing), without a market, so one setup can trade or backtest any market. Applied with
+ * `applySetup`, which fits it to the catalog as the bot describes it then.
  */
-export type StrategySetup = Pick<StrategyConfig, 'strategy' | 'params' | 'rules'> & { name: string; savedAt: number }
+export type StrategySetup = Pick<StrategyConfig, 'strategy' | 'params' | 'rules'> & { sizing?: SizingConfig | null; name: string; savedAt: number }
 
 export const MAX_SETUP_NAME = 60
 export const setupsKey = (connectionId: string) => `setups:${connectionId}`

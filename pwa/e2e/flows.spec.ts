@@ -131,6 +131,38 @@ test('backtests rules of its own, built from the strategy’s syntax, and shows 
   await expect(page.getByText(/upper 3 is not a band of the envelope/).first()).toBeVisible()
 })
 
+test('backtests with a fixed amount, and shows the sizing, the Kelly percent and the stored backtest', async ({ page }) => {
+  await connected(page)
+  await page.goto('#/backtest')
+  await page.getByRole('combobox', { name: 'Position sizing' }).selectOption('fixed')
+  await page.getByLabel("Amount each position is worth, in the account's currency").fill('500')
+  await page.getByRole('button', { name: 'Run the backtest' }).click()
+  const sizing = page.locator('.tile', { hasText: 'Sizing' })
+  await expect(sizing).toContainText('500.00')
+  await expect(sizing).toContainText(/per position · stored as backtest #\d+/)
+  await expect(page.locator('.tile', { hasText: 'Kelly' })).toContainText(/win rate/)
+})
+
+test('starts a session sized by Kelly after confirming it, names the backtest behind it, and shows the bot’s refusal without an edge', async ({ page }) => {
+  await connected(page)
+  await page.goto('#/trading')
+  await expect(page.getByRole('heading', { name: '1 strategy trading.' })).toBeVisible()
+  await page.getByRole('combobox', { name: 'Position sizing' }).selectOption('kelly')
+  await page.getByRole('button', { name: 'Start trading' }).click()
+  await expect(page.getByRole('dialog').getByText('Kelly: the full Kelly percent of the balance, from a backtest of this setup')).toBeVisible()
+  await page.getByRole('dialog').getByRole('button', { name: 'Start trading' }).click()
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText(/Kelly sizing cannot use backtest #\d+: .*no edge/)
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click()
+  // The default rules have no edge on the mock's candles; opening on a deeper band has one.
+  await page.getByRole('group', { name: 'Rule 1' }).getByRole('spinbutton').fill('2')
+  await page.getByRole('button', { name: 'Start trading' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Start trading' }).click()
+  await expect(page.getByRole('heading', { name: '2 strategies trading.' })).toBeVisible()
+  const card = page.locator('li', { hasText: 'drcs 2 · drcs' })
+  await expect(card.getByText(/^Kelly [\d.]+% of the balance per position/)).toBeVisible()
+  await expect(card.getByText(/from backtest #\d+: \d+ trades/)).toBeVisible()
+})
+
 test('stops and starts trading, each after a confirmation', async ({ page }) => {
   await connected(page)
   await page.goto('#/trading')

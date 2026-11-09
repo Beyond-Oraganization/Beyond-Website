@@ -141,3 +141,36 @@ describe('saved setups', () => {
     expect(last()).toMatchObject({ market: 'XAUUSD 1h', rules: ['open short on cross down upper 1', 'close long on cross down lower 1'] })
   })
 })
+
+describe('the position sizing', () => {
+  it('offers the bot’s methods, each with its own value and range, and keeps it across strategies', async () => {
+    const { last } = setup([DRCS, MOMENTUM])
+    const method = screen.getByRole('combobox', { name: 'Position sizing' })
+    expect(method).toHaveValue('percent')
+    expect(screen.getByLabelText('Percent of the balance each position is worth')).toHaveValue(50)
+
+    await userEvent.selectOptions(method, 'kelly')
+    const share = screen.getByLabelText('Percent of the Kelly percent to use')
+    expect(share).toHaveValue(100)
+    await userEvent.clear(share)
+    await userEvent.type(share, '50')
+    expect(last().sizing).toEqual({ method: 'kelly', value: '50' })
+
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: /Strategy/ }), 'momentum')
+    expect(last().sizing).toEqual({ method: 'kelly', value: '50' })
+  })
+
+  it('says when a value is out of range', async () => {
+    setup([DRCS])
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Position sizing' }), 'fixed')
+    const amount = screen.getByLabelText("Amount each position is worth, in the account's currency")
+    await userEvent.clear(amount)
+    await userEvent.type(amount, '0')
+    expect(screen.getByText('amount must be between 0.01 and 1000000000.')).toBeInTheDocument()
+  })
+
+  it('is not offered by a bot from before sizing', () => {
+    setup([LEGACY])
+    expect(screen.queryByRole('combobox', { name: 'Position sizing' })).not.toBeInTheDocument()
+  })
+})

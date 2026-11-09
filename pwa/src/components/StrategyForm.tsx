@@ -1,8 +1,22 @@
 import { useId, useMemo, useState } from 'react'
 import { useBot } from '../api/bot.ts'
 import type { MarketRow } from '../api/parse/markets.ts'
-import type { StrategyDefinition, StrategyParameter } from '../api/parse/strategies.ts'
-import { applySetup, defaultParams, grammarOf, paramKey, ruleKey, storedMarkets, usesDefaultRules, withStrategy, type ConfigErrors, type StrategyConfig } from '../strategy/config.ts'
+import type { SizingCatalog, StrategyDefinition, StrategyParameter } from '../api/parse/strategies.ts'
+import {
+  applySetup,
+  defaultParams,
+  grammarOf,
+  paramKey,
+  ruleKey,
+  SIZING_KEY,
+  sizingFor,
+  storedMarkets,
+  usesDefaultRules,
+  withStrategy,
+  type ConfigErrors,
+  type SizingConfig,
+  type StrategyConfig,
+} from '../strategy/config.ts'
 import { MAX_SETUP_NAME, findSetup, useSetups } from '../strategy/setups.ts'
 import { describedBy, Field } from './Field.tsx'
 import { RuleEditor } from './RuleEditor.tsx'
@@ -31,7 +45,49 @@ function ParameterField({ parameter, value, error, onChange }: { parameter: Stra
   )
 }
 
-/** Named setups (strategy, parameters, rules) kept on this device for this bot, to apply to any market. */
+/**
+ * How big each position is: a method from the bot's catalog and its one value, with the range in the hint. The same
+ * for every strategy, so changing the strategy keeps it.
+ */
+function SizingField({ catalog, sizing, error, onChange }: { catalog: SizingCatalog; sizing: SizingConfig | null; error?: string; onChange: (sizing: SizingConfig) => void }) {
+  const methodId = useId()
+  const valueId = useId()
+  const method = catalog.methods.find((m) => m.name === sizing?.method)
+  const hint = method ? `${method.description} ${method.value.min}–${method.value.max}, default ${method.value.default}.` : undefined
+  return (
+    <div className="form-grid">
+      <Field id={methodId} label="Position sizing" hint={method ? undefined : `Write it as ${catalog.syntax}.`} error={method ? undefined : error}>
+        <select id={methodId} value={sizing?.method ?? ''} onChange={(event) => onChange(sizingFor(catalog, event.target.value))}>
+          {method ? null : <option value="">Choose a sizing</option>}
+          {catalog.methods.map((m) => (
+            <option key={m.name} value={m.name}>
+              {m.title}
+            </option>
+          ))}
+        </select>
+      </Field>
+      {method ? (
+        <Field id={valueId} label={method.value.meaning || method.value.name} hint={hint} error={error}>
+          <input
+            id={valueId}
+            className="mono"
+            type="number"
+            inputMode="decimal"
+            min={method.value.min}
+            max={method.value.max}
+            step="any"
+            value={sizing?.value ?? ''}
+            onChange={(event) => onChange({ method: method.name, value: event.target.value })}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={describedBy(valueId, hint, error)}
+          />
+        </Field>
+      ) : null}
+    </div>
+  )
+}
+
+/** Named setups (strategy, parameters, rules, sizing) kept on this device for this bot, to apply to any market. */
 function Setups({ definitions, config, onApply }: { definitions: StrategyDefinition[]; config: StrategyConfig; onApply: (config: StrategyConfig) => void }) {
   const { connection } = useBot()
   const { setups, save, remove } = useSetups(connection?.id)
@@ -53,7 +109,7 @@ function Setups({ definitions, config, onApply }: { definitions: StrategyDefinit
     const trimmed = name.trim()
     if (!trimmed) return
     const replacing = Boolean(findSetup(setups, trimmed))
-    save({ name: trimmed, strategy: config.strategy, params: { ...config.params }, rules: [...config.rules], savedAt: Date.now() })
+    save({ name: trimmed, strategy: config.strategy, params: { ...config.params }, rules: [...config.rules], sizing: config.sizing, savedAt: Date.now() })
     setChosen(trimmed)
     setName('')
     toast.success(replacing ? 'Setup replaced' : 'Setup saved', `${trimmed}: ${config.strategy}, ${config.rules.length} rule${config.rules.length === 1 ? '' : 's'}.`)
@@ -103,8 +159,8 @@ function Setups({ definitions, config, onApply }: { definitions: StrategyDefinit
 }
 
 /**
- * The strategy, the market, its parameters and its rules, all built from the bot's catalog: nothing here knows a
- * strategy, so a new one on the bot needs no change in the app. Defaults are filled in and ranges and rule syntax
+ * The strategy, the market, its parameters, its rules and the position sizing, all built from the bot's catalog: nothing
+ * here knows a strategy, so a new one on the bot needs no change in the app. Defaults are filled in and ranges and rule syntax
  * checked as you type; the bot checks again, and its message is shown if it disagrees.
  */
 export function StrategyForm({
@@ -190,6 +246,9 @@ export function StrategyForm({
             onChange={(rules) => onChange({ ...config, rules })}
           />
         </>
+      ) : null}
+      {definition?.sizing ? (
+        <SizingField catalog={definition.sizing} sizing={config.sizing} error={errors[SIZING_KEY]} onChange={(sizing) => onChange({ ...config, sizing })} />
       ) : null}
       <Setups definitions={definitions} config={config} onApply={onChange} />
     </div>

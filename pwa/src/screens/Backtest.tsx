@@ -18,6 +18,7 @@ import { useMarkets, useStrategies } from '../hooks/data.ts'
 import { useMemoryWarning } from '../hooks/memory.ts'
 import { db } from '../state/db.ts'
 import { useSettings } from '../state/settings.ts'
+import { splitSizing } from '../words.ts'
 
 type Curve = { time: number; balance: number }[]
 type SavedRun = { id: string; at: number; input: StrategyInput; balance: number; report: BacktestReport; curve: Curve | null }
@@ -25,11 +26,20 @@ type SavedRun = { id: string; at: number; input: StrategyInput; balance: number;
 const dateOrNull = (text: string) => (text ? Date.parse(`${text}T00:00:00Z`) : null)
 
 function Report({ report }: { report: BacktestReport }) {
+  const sizing = report.sizing ? splitSizing(report.sizing) : null
   return (
     <div className="tiles">
       <StatTile label="Profit / loss" value={`${arrow(report.profitLoss)}${fmtSignedMoney(report.profitLoss)}`} sub={fmtSignedPercent(report.returnPercent)} tone={tone(report.profitLoss)} />
       <StatTile label="Balance" value={fmtMoney(report.finalBalance)} sub={`from ${fmtMoney(report.initialBalance)}`} />
       <StatTile label="Trades" value={`${report.trades} closed`} sub={`${report.won} won, ${report.lost} lost, win rate ${fmtPercent(report.winRate, 1)}`} />
+      {sizing ? <StatTile label="Sizing" value={sizing.value} sub={[sizing.sub, report.storedAs ? `stored as backtest #${report.storedAs}` : null].filter(Boolean).join(' · ')} /> : null}
+      {report.kelly ? (
+        <StatTile
+          label="Kelly"
+          value={report.kelly.value.replace(/ of the balance$/, '')}
+          sub={report.kelly.usable ? `of the balance · ${report.kelly.detail}` : report.kelly.detail}
+        />
+      ) : null}
       <StatTile label="Average per trade" value={fmtSignedMoney(report.average)} tone={tone(report.average)} />
       <StatTile label="Best trade" value={fmtSignedMoney(report.best)} sub={fmtPercent(report.bestPercent)} />
       <StatTile label="Max drawdown" value={fmtSignedMoney(report.maxDrawdown)} sub={fmtPercent(report.maxDrawdownPercent)} tone={report.maxDrawdown ? 'loss' : null} />
