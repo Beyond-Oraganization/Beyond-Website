@@ -1,7 +1,7 @@
 {
   "name": "beyond-bot-app",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Beyond Bot: an installable web app that watches and drives the Beyond Bot trading bot through its HTTPS command API.",
   "type": "module",
   "engines": {
