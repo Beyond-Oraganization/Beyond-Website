@@ -1,6 +1,17 @@
-import type { StrategyDefinition } from '../parse/strategies.ts'
+import type { SizingCatalog, StrategyDefinition } from '../parse/strategies.ts'
 
 /** Catalog entries for tests: the bot's own strategy, one the app has never heard of, and one from before rules. */
+
+/** How the bot sizes positions (Sizing/SizingMethods.cs), the same for every strategy. */
+export const SIZING: SizingCatalog = {
+  default: 'percent:50',
+  syntax: 'percent:N | fixed:AMOUNT | kelly[:N]',
+  methods: [
+    { name: 'percent', title: 'Percentage of the balance', description: 'Each position is worth this percent of the balance when it opens.', value: { name: 'percent', default: 50, min: 0.01, max: 100, meaning: 'Percent of the balance each position is worth' } },
+    { name: 'fixed', title: 'Fixed amount', description: "Each position is worth this amount of the account's currency when it opens, whatever the balance.", value: { name: 'amount', default: 100, min: 0.01, max: 1000000000, meaning: "Amount each position is worth, in the account's currency" } },
+    { name: 'kelly', title: 'Kelly criterion', description: 'Each position is worth the Kelly percent of the balance, from a backtest of the same setup.', value: { name: 'share', default: 100, min: 1, max: 100, meaning: 'Percent of the Kelly percent to use' } },
+  ],
+}
 
 export const DRCS: StrategyDefinition = {
   name: 'drcs',
@@ -13,6 +24,7 @@ export const DRCS: StrategyDefinition = {
     { name: 'moving-count', default: 2, min: 1, max: 10, meaning: 'Bands', whole: true },
   ],
   rules: { defaults: ['open long on cross up lower 1', 'close long on cross down lower 1'], syntax: 'open|close long|short on cross up|down lower|upper N' },
+  sizing: SIZING,
 }
 
 /** A strategy the app has never heard of, with a decimal parameter and another kind of condition. */
@@ -23,8 +35,9 @@ export const MOMENTUM: StrategyDefinition = {
   defaultMarket: null,
   parameters: [{ name: 'threshold', default: 0.5, min: 0.1, max: 5, meaning: 'Percent above the average', whole: false }],
   rules: { defaults: ['open long on above ema 20 for 3 candles'], syntax: 'open|close long|short on above|below ema N for N candles' },
+  sizing: SIZING,
 }
 
 /** A strategy of a bot from before rules. */
-export const LEGACY: StrategyDefinition = { ...DRCS, name: 'old', rules: null, parameters: [...DRCS.parameters, { name: 'trigger', default: 1, min: 1, max: 10, meaning: 'Band', whole: true }] }
+export const LEGACY: StrategyDefinition = { ...DRCS, name: 'old', rules: null, sizing: null, parameters: [...DRCS.parameters, { name: 'trigger', default: 1, min: 1, max: 10, meaning: 'Band', whole: true }] }
 

@@ -35,7 +35,7 @@ const DRCS = {
   name: 'drcs',
   title: 'Double Red Cross',
   description:
-    'Builds an adaptive envelope of bands spaced by ATR × deviation below and above the EMA: lower 1 and upper 1 are nearest the center, up to moving-count on each side. Its rules trade on candles crossing those bands, and each open spends half of the balance. By default it buys when a candle opens below lower 1 and closes above it, and closes the newest long when a candle crosses back down through it.',
+    "Builds an adaptive envelope of bands spaced by ATR × deviation below and above the EMA: lower 1 and upper 1 are nearest the center, up to moving-count on each side. Its rules trade on candles crossing those bands; the session's position sizing decides how big each open is (half of the balance unless --sizing says otherwise). By default it buys when a candle opens below lower 1 and closes above it, and closes the newest long when a candle crosses back down through it.",
   market: { symbol: 'XAUUSD', interval: '1h' },
   parameters: [
     { name: 'depth', description: 'Lookback of the EMA and ATR the envelope is built from', default: 23, min: 1, max: 500 },
@@ -45,7 +45,57 @@ const DRCS = {
   // Strategies/Drcs: the rules it trades by when none are given, and how a rule is written (Strategies/Rules).
   rules: ['open long on cross up lower 1', 'close long on cross down lower 1'],
   syntax: 'open|close long|short on cross up|down lower|upper N',
-  balanceShare: 0.5,
+}
+
+// Sizing/SizingMethods.cs: how a session sizes the positions it opens (--sizing METHOD:VALUE), the same for every strategy.
+const SIZING = {
+  default: 'percent:50',
+  syntax: 'percent:N | fixed:AMOUNT | kelly[:N]',
+  methods: [
+    { name: 'percent', title: 'Percentage of the balance', description: 'Each position is worth this percent of the balance when it opens.', value: { name: 'percent', description: 'Percent of the balance each position is worth', default: 50, minimum: 0.01, maximum: 100, wholeNumber: false } },
+    { name: 'fixed', title: 'Fixed amount', description: "Each position is worth this amount of the account's currency when it opens, whatever the balance.", value: { name: 'amount', description: "Amount each position is worth, in the account's currency", default: 100, minimum: 0.01, maximum: 1000000000, wholeNumber: false } },
+    {
+      name: 'kelly',
+      title: 'Kelly criterion',
+      description: 'Each position is worth the Kelly percent of the balance, (b·p − q) / b, from the newest full-history backtest of the same setup (run once when there is none): p is the share of trades won, q the share lost, b the average win over the average loss. The value is how much of Kelly to use: 100 is full Kelly, 50 half. It refuses to start without an edge or with fewer than 20 closed trades.',
+      value: { name: 'share', description: 'Percent of the Kelly percent to use', default: 100, minimum: 1, maximum: 100, wholeNumber: false },
+    },
+  ],
+}
+const KELLY_MINIMUM_TRADES = 20
+/** A percent as the bot writes it in sentences ("0.##"). */
+const pct = (value) => `${Number(value.toFixed(2))}%`
+
+/** Sizing/SizingChoice.cs Parse: { method, value } from "percent:25", "fixed:500", "kelly", "kelly:50". */
+function parseSizing(text) {
+  const notASizing = (why) => new Exit(1, `'${text.trim()}' is not a position sizing${why ? `: ${why}` : ''}. Write ${SIZING.syntax}.`)
+  const [word, valueText] = text.split(':').map((part) => part.trim())
+  const method = SIZING.methods.find((m) => m.name === word.toLowerCase())
+  if (!method) throw notASizing()
+  if (valueText === undefined) {
+    if (method.name !== 'kelly') throw notASizing(`${method.name} needs a value, e.g. ${method.name}:${method.value.default}`)
+    return { method: method.name, value: method.value.default }
+  }
+  const value = Number(valueText)
+  if (valueText === '' || Number.isNaN(value)) throw notASizing(`'${valueText}' is not a number`)
+  if (value < method.value.minimum || value > method.value.maximum) throw notASizing(`${method.value.name} must be between ${method.value.minimum} and ${method.value.maximum}; got ${value}`)
+  return { method: method.name, value }
+}
+
+/** Sizing/KellyEstimate.cs: (b·p − q) / b over a backtest's closed trades, and why it cannot size positions. */
+function kellyEstimate({ closed, won, lost, averageWin, averageLoss }) {
+  const winProbability = closed ? won / closed : 0
+  const lossProbability = closed ? lost / closed : 0
+  const payoffRatio = won && lost && averageWin > 0 && averageLoss > 0 ? averageWin / averageLoss : null
+  const percent = payoffRatio != null ? ((payoffRatio * winProbability - lossProbability) / payoffRatio) * 100 : null
+  const whyUnusable =
+    closed < KELLY_MINIMUM_TRADES ? `only ${closed} closed trades (it needs at least ${KELLY_MINIMUM_TRADES})`
+    : !won ? 'no winning trade'
+    : !lost ? 'no losing trade'
+    : percent == null ? 'no payoff could be worked out'
+    : percent <= 0 ? `Kelly is ${Number(percent.toFixed(2))}% (no edge)`
+    : null
+  return { trades: closed, wins: won, losses: lost, averageWin, averageLoss, winProbability, lossProbability, payoffRatio, percent, whyUnusable }
 }
 
 /** A command that ended with this exit code, message and hint (Cli/ErrorReporter.cs). */
@@ -184,6 +234,8 @@ export function createBot(options = {}) {
     positions: [],
     records: [],
     sessions: new Map(),
+    /** Stored backtests, oldest first (Persistence/IBacktestRepository.cs). */
+    backtests: [],
     stats: { startBalance: null, tradesOpened: 0, tradesClosed: 0, realizedProfit: 0, wins: 0, losses: 0 },
     nextOrder: 812345,
     orderingBug: options.orderingBug ?? false,
@@ -302,10 +354,10 @@ export function createBot(options = {}) {
     const fired = checks.find((check) => check.met)
     const side = (rule) => (rule.side === 'long' ? 'Buy' : 'Sell')
     const signal = !fired
-      ? { action: 'None', side: 'None', balanceShare: 0 }
+      ? { action: 'None', side: 'None' }
       : fired.rule.action === 'open'
-        ? { action: 'Open', side: side(fired.rule), balanceShare: DRCS.balanceShare }
-        : { action: 'Close', side: side(fired.rule), balanceShare: 0 }
+        ? { action: 'Open', side: side(fired.rule) }
+        : { action: 'Close', side: side(fired.rule) }
     const reason = fired ? `${fired.rule.text[0].toUpperCase()}${fired.rule.text.slice(1)}: ${fired.reason}.` : `No rule fired: ${[...new Set(checks.map((check) => check.reason))].join('; ')}.`
     const levels = [...new Map(checks.map((check) => [check.rule.line, { name: check.rule.line, value: round(check.level, 6), isLevel: true }])).values()]
     const values = [
@@ -319,7 +371,7 @@ export function createBot(options = {}) {
   }
   const positionSide = (side) => (side === 'Buy' ? 'long' : 'short')
   const signalText = (signal) =>
-    signal.action === 'Open' ? `open ${positionSide(signal.side)} (${Math.round(signal.balanceShare * 100)} % of balance)` : signal.action === 'Close' ? `close ${positionSide(signal.side)}` : 'none'
+    signal.action === 'Open' ? `open ${positionSide(signal.side)}` : signal.action === 'Close' ? `close ${positionSide(signal.side)}` : 'none'
 
   // ---------- account ----------
   const symbolInfo = (symbol) => SYMBOLS[symbol] ?? { price: 100, quote: 'USD' }
@@ -384,7 +436,7 @@ export function createBot(options = {}) {
     const insight = explain(market.candles, i, session.params, session.rules)
     let trade = null
     if (!preview && insight.signal.action === 'Open') {
-      const quantity = round((s.account.balance * insight.signal.balanceShare) / candle.close / 10, 2)
+      const quantity = round(sizedQuantity(session.sizing, s.account.balance, candle.close) / 10, 2)
       const order = open(market.symbol, insight.signal.side, Math.max(quantity, 0.01), 'drcs')
       session.positions.push(order.orderId)
       trade = { market: base.market, strategy: 'drcs', action: 'Opened', order: orderJson(order), time: base.time }
@@ -456,7 +508,7 @@ export function createBot(options = {}) {
       strategies: [...s.sessions.values()].sort((a, b) => a.key.localeCompare(b.key) || a.startedAt - b.startedAt).map((x) => {
         const m = s.markets.get(x.key)
         return {
-          name: x.name, market: { symbol: m.symbol, interval: m.interval.name }, strategy: 'drcs', parameters: x.params, rules: x.rules.map((r) => r.text), startedAt: new Date(x.startedAt).toISOString(),
+          name: x.name, market: { symbol: m.symbol, interval: m.interval.name }, strategy: 'drcs', parameters: x.params, rules: x.rules.map((r) => r.text), sizing: x.sizing, startedAt: new Date(x.startedAt).toISOString(),
           ticks: x.ticks, trades: x.trades, lastTick: x.lastTick, lastError: x.lastError, lastErrorAt: x.lastErrorAt, nextTickAt: new Date(nextBoundary(m.interval.ms)).toISOString(),
         }
       }),
@@ -512,12 +564,12 @@ export function createBot(options = {}) {
   const strategiesSection = (o, list, t) => {
     if (!list.length) return o.section('Strategies', (x) => x.text('No strategy is trading. Start one with: trading start drcs'))
     o.section(`Strategies (${list.length} running)`, (x) =>
-      x.table(['Market', 'Strategy', 'Parameters and rules', 'Running', 'Ticks', 'Trades', 'Last signal', 'Next tick', 'Last error'], list.map((st) => {
+      x.table(['Market', 'Strategy', 'Parameters, rules, sizing', 'Running', 'Ticks', 'Trades', 'Last signal', 'Next tick', 'Last error'], list.map((st) => {
         const m = s.markets.get(st.key)
         const next = nextBoundary(m.interval.ms)
         const last = st.lastTick?.insight ? signalText(st.lastTick.insight.signal) : st.lastTick?.outcome ?? '–'
         const parameters = Object.entries(st.params).map(([k, v]) => `${k}=${F.plain(v)}`).join(' ')
-        return [`${m.symbol} ${m.interval.code}`, 'drcs', `${parameters}\n${st.rules.map((r) => r.text).join('\n')}`, F.duration((t - st.startedAt) / 1000), String(st.ticks), String(st.trades), last, `${F.clock(next)} (in ${F.duration((next - t) / 1000)})`, st.lastError ?? 'none']
+        return [`${m.symbol} ${m.interval.code}`, 'drcs', `${parameters}\n${st.rules.map((r) => r.text).join('\n')}\nsizing: ${sizingWords(st.sizing)}`, F.duration((t - st.startedAt) / 1000), String(st.ticks), String(st.trades), last, `${F.clock(next)} (in ${F.duration((next - t) / 1000)})`, st.lastError ?? 'none']
       })),
     )
   }
@@ -853,6 +905,7 @@ export function createBot(options = {}) {
           name: DRCS.name, title: DRCS.title, description: DRCS.description, symbol: DRCS.market.symbol, interval: DRCS.market.interval,
           parameters: DRCS.parameters.map((p) => ({ name: p.name, description: p.description, default: p.default, minimum: p.min, maximum: p.max, wholeNumber: true })),
           rules: { defaults: DRCS.rules, syntax: DRCS.syntax },
+          sizing: SIZING,
         }]
         o.text(JSON.stringify(value, null, 2))
         return { json: value }
@@ -865,6 +918,7 @@ export function createBot(options = {}) {
         x.text(`Write a rule: ${DRCS.syntax}`)
       })
       o.text('Set a parameter with --set NAME=VALUE and replace the rules with --rule, e.g. backtest drcs --set depth=30 --rule "open short on cross down upper 1" --rule "close short on cross up upper 1".')
+      o.text(`Size positions with --sizing ${SIZING.syntax}; ${SIZING.default} when left out, for backtest and trading start alike.`)
     },
     signal: (o, argv) => {
       const input = strategyInput(argv)
@@ -878,7 +932,8 @@ export function createBot(options = {}) {
       o.text(`${describeParams(input.params, input.rules)}; the next candle closes at ${F.hhmm(nextBoundary(market.interval.ms))} UTC.`)
     },
     backtest: (o, argv) => {
-      const input = strategyInput(argv, { '--balance': { alias: '-b', value: true }, '--from': { value: true }, '--to': { value: true } })
+      const input = strategyInput(argv, { '--balance': { alias: '-b', value: true }, '--from': { value: true }, '--to': { value: true }, '--sizing': { value: true } })
+      const choice = parseSizing(input.opt.sizing ?? SIZING.default)
       const market = marketOrFail(input.symbol, input.interval)
       s.loaded.add(keyOf(market.symbol, market.interval.code))
       o.text(`Reading ${market.symbol} ${market.interval.code} candles…`)
@@ -886,13 +941,17 @@ export function createBot(options = {}) {
       const initial = Number(input.opt.balance ?? 1000)
       const startAt = input.opt.from ? parseDate(input.opt.from) : market.candles[0].openTime
       const endAt = input.opt.to ? parseDate(input.opt.to) : now()
-      const report = backtestRun(market, input.params, input.rules, initial, startAt, endAt)
+      const sizing = resolveSizing(choice, market, input.params, input.rules)
+      const report = backtestRun(market, input.params, input.rules, initial, startAt, endAt, sizing)
+      const stored = storeBacktest(market, input.params, input.rules, sizing, initial, startAt, endAt, report)
       o.section(`Backtest: drcs on ${market.symbol} ${market.interval.code}`, (x) =>
         x.grid([
           ['Period', `${F.time(startAt)} → ${F.time(endAt)} UTC, ${F.count(report.evaluated)} candles`],
           ['Balance', `${F.money(initial)} → ${F.money(report.balance)}`],
           ['Profit / loss', `${F.signedMoney(report.balance - initial)} ${F.signedPercent(((report.balance - initial) / initial) * 100)}`],
           ['Trades', `${report.closed} closed: ${report.won} won, ${report.lost} lost, win rate ${F.percent(report.closed ? (report.won / report.closed) * 100 : 0, 1)}`],
+          ['Sizing', sizingWords(sizing)],
+          ['Kelly', kellyWords(kellyEstimate(report))],
           ['Average per trade', F.signedMoney(report.closed ? (report.balance - initial) / report.closed : 0)],
           ['Best trade', `${F.signedMoney(report.maxProfit)} (${F.percent(report.maxProfitPercent)})`],
           ['Max drawdown', `${F.signedMoney(report.maxDrawdown)} (${F.percent(report.maxDrawdownPercent)})`],
@@ -901,9 +960,29 @@ export function createBot(options = {}) {
         ]),
       )
       o.text(describeParams(input.params, input.rules))
+      o.text(`Stored as backtest #${stored.id}; 'backtests' lists them. Kelly sizing of this setup reads the newest one that starts at the first stored candle.`)
+    },
+    backtests: (o, argv) => {
+      const { pos, opt } = readArgs(argv, { '--symbol': { alias: '-s', value: true }, '--interval': { alias: '-i', value: true }, '--last': { alias: '-n', value: true }, '--json': {} })
+      const list = [...s.backtests].reverse()
+        .filter((b) => (!pos[0] || b.strategy === pos[0].toLowerCase()) && (!opt.symbol || b.market.symbol === opt.symbol.toUpperCase()) && (!opt.interval || b.market.interval === parseInterval(opt.interval)?.name))
+        .slice(0, Number(opt.last ?? 20))
+      const json = list.map((b) => ({ ...b, kelly: kellyEstimate({ closed: b.trades, won: b.wins, lost: b.losses, averageWin: b.averageWin, averageLoss: b.averageLoss }) }))
+      if (opt.json) {
+        o.text(JSON.stringify(json, null, 2))
+        return { json }
+      }
+      if (!list.length) return o.text('No backtest is stored yet. Run one with: backtest drcs -d')
+      o.table(['#', 'Run (UTC)', 'Strategy', 'Market', 'Period', 'Trades', 'Win rate', 'Payoff', 'Kelly', 'Return', 'Sizing'], json.map((b) => [
+        String(b.id), F.time(Date.parse(b.createdAt)), b.strategy, `${b.market.symbol} ${parseInterval(b.market.interval).code}`, `${b.start.slice(0, 10)} → ${b.end.slice(0, 10)}`, F.count(b.trades),
+        F.percent(b.trades ? (b.wins / b.trades) * 100 : 0, 1), b.kelly.payoffRatio != null ? b.kelly.payoffRatio.toFixed(2) : '–', b.kelly.whyUnusable ? 'none' : pct(b.kelly.percent),
+        F.signedPercent(((b.finalBalance - b.initialBalance) / b.initialBalance) * 100), b.sizing.split(' ')[0],
+      ]))
+      for (const b of list) o.text(`#${b.id}: ${b.setup}`)
     },
     'trading start': (o, argv) => {
-      const input = strategyInput(argv, { '--live': {}, '--name': { alias: '-n', value: true } })
+      const input = strategyInput(argv, { '--live': {}, '--name': { alias: '-n', value: true }, '--sizing': { value: true } })
+      const choice = parseSizing(input.opt.sizing ?? SIZING.default)
       requireLogin()
       if (users.get(s.user.toLowerCase())?.mode === 'Live' && !input.opt.live)
         throw new Exit(1, `'${s.user}' is a LIVE ${users.get(s.user.toLowerCase()).broker} account: this strategy trades real money. Start it? Pass --live to confirm without being asked.`)
@@ -917,13 +996,16 @@ export function createBot(options = {}) {
       const taken = (n) => [...s.sessions.keys()].some((k) => k.toLowerCase() === n.toLowerCase())
       let name = given
       if (!name) for (let n = 1; !name; n++) if (!taken(n === 1 ? 'drcs' : `drcs ${n}`)) name = n === 1 ? 'drcs' : `drcs ${n}`
+      // TradingSupervisor.StartAsync: the sizing is worked out before anything is replaced, so a refused Kelly changes nothing.
+      const sizing = resolveSizing(choice, market, input.params, input.rules)
       const replacing = [...s.sessions.keys()].find((k) => k.toLowerCase() === name.toLowerCase())
       if (replacing) s.sessions.delete(replacing)
-      const session = { name, key, params: input.params, rules: input.rules, startedAt: now(), ticks: 0, trades: 0, lastTick: null, lastError: null, lastErrorAt: null, evaluated: -1, positions: [], nextTickAt: nextBoundary(market.interval.ms) }
+      const session = { name, key, params: input.params, rules: input.rules, sizing, startedAt: now(), ticks: 0, trades: 0, lastTick: null, lastError: null, lastErrorAt: null, evaluated: -1, positions: [], nextTickAt: nextBoundary(market.interval.ms) }
       const preview = tick(session, true)
       s.sessions.set(name, session)
       insightPanel(o, market, preview)
       o.text(`✓ ${replacing ? 'Replaced' : 'Started'} ${name}: trading ${market.symbol} ${market.interval.code} with drcs on cTrader DEMO (${describeParams(input.params, input.rules)}).`)
+      o.text(`  Position sizing: ${sizingWords(sizing)}${sizing.kelly ? `, from ${kellyBasisWords(sizing.kelly)}` : ''}.`)
       o.text(`  The newest candle was only previewed; the first trade can come at the next close, ${F.hhmm(session.nextTickAt)} UTC. Each tick prints a line here.`)
     },
     'trading stop': (o, argv) => {
@@ -996,10 +1078,12 @@ export function createBot(options = {}) {
   const candleJson = (c) => ({ openTime: new Date(c.openTime).toISOString(), closeTime: new Date(c.closeTime).toISOString(), open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume })
   const snapshotLog = () => `/opt/beyondbot/logs/beyondbot-${new Date(startedAt).toISOString().slice(0, 10).replace(/-/g, '')}.log`
 
-  function backtestRun(market, p, rules, initial, startAt, endAt) {
+  function backtestRun(market, p, rules, initial, startAt, endAt, sizing = DEFAULT_SIZING) {
     const cache = indicators(market.candles, p.depth)
     let balance = initial
     let peak = initial
+    let winReturns = 0
+    let lossReturns = 0
     const open = []
     const r = { evaluated: 0, closed: 0, won: 0, lost: 0, maxProfit: 0, maxProfitPercent: 0, maxDrawdown: 0, maxDrawdownPercent: 0 }
     market.candles.forEach((c, i) => {
@@ -1009,15 +1093,23 @@ export function createBot(options = {}) {
       const { signal } = explain(market.candles, i, p, rules, cache)
       // Backtesting/BacktestLedger.cs: a close closes the newest open position on its side.
       const newest = signal.action === 'Close' ? open.findLastIndex((position) => position.side === signal.side) : -1
-      if (signal.action === 'Open') open.push({ quantity: (balance * signal.balanceShare) / c.close, price: c.close, side: signal.side })
+      if (signal.action === 'Open') open.push({ quantity: sizedQuantity(sizing, balance, c.close), price: c.close, side: signal.side })
       else if (newest >= 0) {
         const [position] = open.splice(newest, 1)
         const pnl = (c.close - position.price) * position.quantity * (position.side === 'Buy' ? 1 : -1)
         const before = balance
         balance += pnl
         r.closed++
-        if (pnl > 0) r.won++
-        if (pnl < 0) r.lost++
+        // Per unit of position value (BacktestLedger.cs), so the sizing does not change Kelly's inputs.
+        const tradeReturn = ((c.close - position.price) / position.price) * (position.side === 'Buy' ? 1 : -1)
+        if (pnl > 0) {
+          r.won++
+          winReturns += tradeReturn
+        }
+        if (pnl < 0) {
+          r.lost++
+          lossReturns -= tradeReturn
+        }
         r.maxProfit = Math.max(r.maxProfit, pnl)
         r.maxProfitPercent = Math.max(r.maxProfitPercent, before > 0 ? (pnl / before) * 100 : 0)
         peak = Math.max(peak, balance)
@@ -1025,7 +1117,47 @@ export function createBot(options = {}) {
         r.maxDrawdownPercent = Math.min(r.maxDrawdownPercent, peak > 0 ? ((balance - peak) / peak) * 100 : 0)
       }
     })
-    return { ...r, balance, open: open.length }
+    return { ...r, balance, open: open.length, averageWin: r.won ? winReturns / r.won : 0, averageLoss: r.lost ? lossReturns / r.lost : 0 }
+  }
+
+  // ---------- position sizing (Sizing/, Trading/SizingResolver.cs, Backtesting/BacktestHistory.cs) ----------
+  const DEFAULT_SIZING = { method: 'Percent', value: 50, kelly: null }
+  /** PositionSizing.Quantity */
+  const sizedQuantity = (sizing, balance, close) => (sizing.method === 'Fixed' ? sizing.value / close : (balance * sizing.value) / 100 / close)
+  /** Cli/Rendering/SizingViews.cs Describe */
+  const sizingWords = (sizing) =>
+    sizing.method === 'Fixed' ? `${F.money(sizing.value)} per position`
+    : sizing.kelly && sizing.kelly.shareOfKelly < 100 ? `Kelly, ${pct(sizing.kelly.shareOfKelly)} of ${pct(sizing.kelly.estimate.percent)} = ${pct(sizing.value)} of the balance per position`
+    : sizing.kelly ? `Kelly ${pct(sizing.value)} of the balance per position`
+    : `${pct(sizing.value)} of the balance per position`
+  const kellyBasisWords = (kelly) =>
+    `backtest #${kelly.backtestId} (run ${F.time(Date.parse(kelly.backtestedAt))} UTC: ${F.time(Date.parse(kelly.from))} → ${F.time(Date.parse(kelly.to))} UTC, ${F.count(kelly.estimate.trades)} trades, win rate ${F.percent(kelly.estimate.winProbability * 100, 1)}, payoff ${kelly.estimate.payoffRatio != null ? kelly.estimate.payoffRatio.toFixed(2) : '–'})`
+  const kellyWords = (kelly) => {
+    const odds = `win rate ${F.percent(kelly.winProbability * 100, 1)}, loss rate ${F.percent(kelly.lossProbability * 100, 1)}, payoff ${kelly.payoffRatio != null ? kelly.payoffRatio.toFixed(2) : '–'} (average win +${pct(kelly.averageWin * 100)}, average loss -${pct(kelly.averageLoss * 100)})`
+    return kelly.whyUnusable ? `not usable: ${kelly.whyUnusable}; ${odds}` : `${pct(kelly.percent)} of the balance: ${odds}`
+  }
+  const setupOf = (p, rules) => describeParams(p, rules)
+  function storeBacktest(market, p, rules, sizing, initial, startAt, endAt, report) {
+    const record = {
+      id: s.backtests.length + 1, strategy: 'drcs', market: { symbol: market.symbol, interval: market.interval.name }, setup: setupOf(p, rules),
+      sizing: sizing.kelly ? `kelly:${sizing.kelly.shareOfKelly} = ${pct(sizing.value)} of the balance` : `${sizing.method.toLowerCase()}:${sizing.value}`,
+      start: new Date(startAt).toISOString(), end: new Date(endAt).toISOString(), candles: report.evaluated, initialBalance: initial, finalBalance: round(report.balance, 8),
+      trades: report.closed, wins: report.won, losses: report.lost, averageWin: report.averageWin, averageLoss: report.averageLoss, maxDrawdownPercentage: report.maxDrawdownPercent, createdAt: new Date(now()).toISOString(),
+    }
+    s.backtests.push(record)
+    return record
+  }
+  /** SizingResolver: a percent or an amount is what it says; Kelly reads the newest full-history backtest of the setup, run once when missing. */
+  function resolveSizing(choice, market, p, rules) {
+    if (choice.method === 'percent') return { method: 'Percent', value: choice.value, kelly: null }
+    if (choice.method === 'fixed') return { method: 'Fixed', value: choice.value, kelly: null }
+    const first = market.candles[0].openTime
+    const setup = setupOf(p, rules)
+    const stored = [...s.backtests].reverse().find((b) => b.market.symbol === market.symbol && b.market.interval === market.interval.name && b.setup === setup && Date.parse(b.start) <= first)
+      ?? storeBacktest(market, p, rules, DEFAULT_SIZING, 1000, first, now(), backtestRun(market, p, rules, 1000, first, now()))
+    const estimate = kellyEstimate({ closed: stored.trades, won: stored.wins, lost: stored.losses, averageWin: stored.averageWin, averageLoss: stored.averageLoss })
+    if (estimate.whyUnusable) throw new Exit(1, `Kelly sizing cannot use backtest #${stored.id}: ${estimate.whyUnusable}. Choose --sizing percent:N or fixed:AMOUNT, or change the rules.`)
+    return { method: 'Kelly', value: (estimate.percent * choice.value) / 100, kelly: { estimate, shareOfKelly: choice.value, backtestId: stored.id, backtestedAt: stored.createdAt, from: stored.start, to: stored.end } }
   }
 
   // ---------- the starting state: a signed-in Demo account trading XAUUSD 1h ----------
@@ -1048,7 +1180,7 @@ export function createBot(options = {}) {
     s.records.unshift({ orderId: '812301', symbol: 'XAUUSD', quantity: 2, price: round(xau.candles.at(-90).close, 2), status: 'None', type: 'Market', side: 'Buy', createdAt: xau.candles.at(-90).closeTime })
     if (options.trading !== false) {
       const startParams = params()
-      const session = { name: 'drcs', key: 'XAUUSD 1h', params: startParams, rules: rulesOf([], startParams), startedAt: now() - 5 * 3600e3 - 12 * 60e3, ticks: 5, trades: 1, lastTick: null, lastError: null, lastErrorAt: null, evaluated: -1, positions: [position.orderId], nextTickAt: nextBoundary(3600e3) }
+      const session = { name: 'drcs', key: 'XAUUSD 1h', params: startParams, rules: rulesOf([], startParams), sizing: DEFAULT_SIZING, startedAt: now() - 5 * 3600e3 - 12 * 60e3, ticks: 5, trades: 1, lastTick: null, lastError: null, lastErrorAt: null, evaluated: -1, positions: [position.orderId], nextTickAt: nextBoundary(3600e3) }
       tick(session, true)
       session.lastTick = { ...session.lastTick, outcome: 'Evaluated' }
       s.sessions.set('drcs', session)
@@ -1073,7 +1205,8 @@ COMMANDS:
     indicators     show
     strategies     The strategies the bot can run, with their parameters and rules.
     signal         What a strategy decides on the newest candle, and why. Never trades.
-    backtest       Replay a strategy over stored candles with a simulated account.
+    backtest       Replay a strategy over stored candles with a simulated account, and store the result.
+    backtests      The stored backtests, newest first, with their Kelly percent.
     trading        start, stop, status
     orders         list, place, close, clear`
 

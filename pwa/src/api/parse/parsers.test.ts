@@ -1,13 +1,13 @@
 import { afterAll, describe, expect, it } from 'vitest'
 import { createBot } from '../../../mock-bot/bot.mjs'
-import { legacyStrategies, realBacktest, realMarketList, realStrategiesJson } from '../fixtures/real.ts'
+import { legacyStrategies, realBacktest, realMarketList, realSizedBacktest, realSizedStrategiesJson, realStrategiesJson } from '../fixtures/real.ts'
 import type { CommandResult } from '../types.ts'
 import { parseSession } from '../session.ts'
 import { notices } from './blocks.ts'
 import { parseCandles, parseIndicators, parseMarketList, parseMarketSync, parseOldestCandle } from './markets.ts'
 import { parseOrders, readFill } from './orders.ts'
 import { parseStatus } from './status.ts'
-import { parseBacktest, parseSignal, parseStrategyCatalog, readParameterLine, readSignal, readStrategyLine } from './strategies.ts'
+import { parseBacktest, parseSignal, parseStrategyCatalog, readKelly, readParameterLine, readSignal, readStrategyLine } from './strategies.ts'
 
 const bot = createBot({ ticking: false, addDelayMs: 0, start: Date.UTC(2026, 10, 4, 10, 15) })
 afterAll(() => bot.stop())
@@ -50,6 +50,42 @@ describe('the bot’s own approved outputs', () => {
     expect(readStrategyLine('depth=30 deviation=1 moving-count=2, rules: open short on cross down upper 1')).toEqual({ parameters: 'depth=30 deviation=1 moving-count=2', rules: ['open short on cross down upper 1'] })
     expect(readStrategyLine('depth=23 deviation=1 moving-count=2 trigger=1')).toEqual({ parameters: 'depth=23 deviation=1 moving-count=2 trigger=1', rules: [] })
     expect(readStrategyLine(null)).toEqual({ parameters: null, rules: [] })
+  })
+
+  it('reads the Sizing and Kelly rows of a bot with position sizing, and the backtest it was stored as', () => {
+    const report = parseBacktest(realSizedBacktest)
+    expect(report.ok && report.value).toMatchObject({
+      finalBalance: 1015.03,
+      sizing: '50% of the balance per position',
+      kelly: { value: '3.26% of the balance', detail: 'win rate 28.8%, loss rate 71.3%, payoff 2.80 (average win +1.22%, average loss -0.43%)', usable: true },
+      storedAs: 1,
+      parameters: 'depth=23 deviation=1 moving-count=2',
+    })
+    const before = parseBacktest(realBacktest)
+    expect(before.ok && before.value).toMatchObject({ sizing: null, kelly: null, storedAs: null })
+  })
+
+  it('reads a Kelly row that is not usable', () => {
+    expect(readKelly('not usable: only 12 closed trades (it needs at least 20); win rate 50.0%, loss rate 50.0%, payoff 2.00 (average win +2%, average loss -1%)')).toEqual({
+      value: 'not usable',
+      detail: 'only 12 closed trades (it needs at least 20); win rate 50.0%, loss rate 50.0%, payoff 2.00 (average win +2%, average loss -1%)',
+      usable: false,
+    })
+  })
+
+  it('reads how positions can be sized from strategies --json, and none from a bot before sizing', () => {
+    const sized = parseStrategyCatalog(realSizedStrategiesJson)
+    expect(sized.ok && sized.value[0]?.sizing).toEqual({
+      default: 'percent:50',
+      syntax: 'percent:N | fixed:AMOUNT | kelly[:N]',
+      methods: [
+        expect.objectContaining({ name: 'percent', title: 'Percentage of the balance', value: { name: 'percent', default: 50, min: 0.01, max: 100, meaning: 'Percent of the balance each position is worth' } }),
+        expect.objectContaining({ name: 'fixed', value: expect.objectContaining({ name: 'amount', min: 0.01, max: 1000000000 }) }),
+        expect.objectContaining({ name: 'kelly', value: expect.objectContaining({ name: 'share', default: 100, min: 1, max: 100 }) }),
+      ],
+    })
+    const before = parseStrategyCatalog(realStrategiesJson)
+    expect(before.ok && before.value[0]?.sizing).toBeNull()
   })
 
   it('reads the strategy catalog from strategies --json', () => {
@@ -107,6 +143,9 @@ describe('the bot’s own approved outputs', () => {
   it('still reads the signals of a bot from before rules', () => {
     expect(readSignal('open buy (50 % of balance)')).toEqual({ action: 'open', side: 'buy', share: 50 })
     expect(readSignal('close newest position')).toEqual({ action: 'close', side: null, share: null })
+    // Since position sizing the session sizes the open, so the signal names no share.
+    expect(readSignal('open long')).toEqual({ action: 'open', side: 'buy', share: null })
+    expect(readSignal('open short')).toEqual({ action: 'open', side: 'sell', share: null })
   })
 })
 
@@ -151,6 +190,27 @@ describe('answers from the mock bot', () => {
     const report = parseBacktest(await run('backtest', 'drcs', '--symbol', 'XAUUSD', '--interval', '1h', '--set', 'depth=30', '--rule', 'open short on cross down upper 2', '--rule', 'close short on cross up upper 2', '-d', '--balance', '5000'))
     expect(report.ok && report.value.initialBalance).toBe(5000)
     expect(report.ok && report.value).toMatchObject({ parameters: 'depth=30 deviation=1 moving-count=2', rules: ['open short on cross down upper 2', 'close short on cross up upper 2'] })
+  })
+
+  it('sizes backtests and sessions as --sizing says, Kelly from a stored full-history backtest', async () => {
+    const catalog = parseStrategyCatalog(await run('strategies', '--json'))
+    expect(catalog.ok && catalog.value[0]?.sizing?.methods.map((m) => m.name)).toEqual(['percent', 'fixed', 'kelly'])
+    const fixed = parseBacktest(await run('backtest', 'drcs', '-d', '--sizing', 'fixed:500'))
+    expect(fixed.ok && fixed.value.sizing).toBe('500.00 per position')
+    const id = fixed.ok ? fixed.value.storedAs! : NaN
+    const edge = ['--rule', 'open long on cross up lower 2', '--rule', 'close long on cross down lower 1']
+    const started = await run('trading', 'start', 'drcs', '-d', ...edge, '--sizing', 'kelly:50', '--name', 'kelly')
+    expect(started.exitCode, started.error?.message).toBe(0)
+    expect(notices(started).other.join(' ')).toMatch(new RegExp(`Position sizing: Kelly, 50% of [\\d.]+% = [\\d.]+% of the balance per position, from backtest #${id + 1} `))
+    const snapshot = parseSession(await run('session', '--json'))
+    const kelly = snapshot.ok ? snapshot.value.strategies.find((x) => x.name === 'kelly')?.sizing : null
+    expect(kelly).toMatchObject({ method: 'Kelly', kelly: { shareOfKelly: 50, backtestId: id + 1 } })
+    const refused = await run('trading', 'start', 'drcs', '-d', '--sizing', 'kelly')
+    expect(refused.exitCode).toBe(1)
+    // The default rules' full-history backtest is the fixed-amount one run above: it is read, not run again.
+    expect(refused.error?.message).toMatch(new RegExp(`^Kelly sizing cannot use backtest #${id}: .*\\. Choose --sizing percent:N or fixed:AMOUNT, or change the rules\\.$`))
+    const listed = await run('backtests', '--json')
+    expect((listed.json as { id: number }[]).slice(0, 2).map((b) => b.id)).toEqual([id + 1, id])
   })
 
   it('a rule the strategy cannot have fails with the bot’s message', async () => {

@@ -103,8 +103,11 @@ export type SessionStats = {
   losses: number
 }
 
-/** A close names its side; a bot from before rules closed the newest position of any side ('CloseNewest'). */
-export type Signal = { action: 'None' | 'Open' | 'Close' | 'CloseNewest'; side: OrderSide; balanceShare: number }
+/**
+ * A close names its side; a bot from before rules closed the newest position of any side ('CloseNewest'). A bot from
+ * before position sizing also sent the share of the balance an open spends; since, the session's `sizing` says it.
+ */
+export type Signal = { action: 'None' | 'Open' | 'Close' | 'CloseNewest'; side: OrderSide; balanceShare?: number }
 /** `isLevel`: a price level the candle was compared with, such as a band (bots from before rules send no flag). */
 export type InsightValue = { name: string; value: number; isLevel?: boolean }
 export type StrategyInsight = { signal: Signal; reason: string; values: InsightValue[] }
@@ -150,6 +153,32 @@ export type TickReport = {
   error: string | null
 }
 
+/** The numbers behind a Kelly percent: a backtest's closed trades (Sizing/KellyEstimate.cs). */
+export type KellyEstimate = {
+  trades: number
+  wins: number
+  losses: number
+  /** The average return of the winning trades per unit of position value (0.012 is +1.2 %). */
+  averageWin: number
+  /** The average size of the losing trades' returns, positive. */
+  averageLoss: number
+  winProbability: number
+  lossProbability: number
+  payoffRatio: number | null
+  /** Kelly in percent. */
+  percent: number | null
+  whyUnusable: string | null
+}
+
+/** How a running session sizes its positions (Sizing/PositionSizing.cs). */
+export type SessionSizing = {
+  method: 'Percent' | 'Fixed' | 'Kelly'
+  /** Fixed: the amount per position; Percent and Kelly: the percent of the balance. */
+  value: number
+  /** Where a Kelly percent came from; null for the other methods. */
+  kelly: { estimate: KellyEstimate; shareOfKelly: number; backtestId: number; backtestedAt: Iso; from: Iso; to: Iso } | null
+}
+
 export type TradingSessionState = {
   /** The session's name (several can trade one market); a bot from before names sends none: use `sessionName`. */
   name?: string
@@ -158,6 +187,8 @@ export type TradingSessionState = {
   parameters: Record<string, number>
   /** The rules it trades by, in order (a bot from before rules sends none). */
   rules?: string[]
+  /** How it sizes its positions (a bot from before sizing sends none: half the balance). */
+  sizing?: SessionSizing
   startedAt: Iso
   ticks: number
   trades: number

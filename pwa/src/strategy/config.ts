@@ -1,19 +1,23 @@
-import type { StrategyInput } from '../api/commands.ts'
+import { plainNumber, type StrategyInput } from '../api/commands.ts'
 import type { MarketRow } from '../api/parse/markets.ts'
-import type { StrategyDefinition } from '../api/parse/strategies.ts'
+import type { SizingCatalog, StrategyDefinition } from '../api/parse/strategies.ts'
 import { compileRuleSyntax, readRule, type RuleGrammar } from './rules.ts'
 
-/**
- * How a strategy trades: which one, on which market, its parameters (as typed) and its rules, in the order they
- * are tried. It is the same shape for every strategy; what a strategy accepts comes from the bot's catalog, so a
- * new strategy needs no change here.
- */
-export type StrategyConfig = { strategy: string; market: string; params: Record<string, string>; rules: string[] }
+/** How big each position is: a sizing method of the bot's catalog (`percent`, `fixed`, `kelly`) and its value, as typed. */
+export type SizingConfig = { method: string; value: string }
 
-/** What is wrong with a config, by place: `strategy`, `market`, `param:<name>`, `rules`, `rule:<index>`. */
+/**
+ * How a strategy trades: which one, on which market, its parameters (as typed), its rules, in the order they are
+ * tried, and how its positions are sized (null on a bot from before sizing). It is the same shape for every
+ * strategy; what a strategy accepts comes from the bot's catalog, so a new strategy needs no change here.
+ */
+export type StrategyConfig = { strategy: string; market: string; params: Record<string, string>; rules: string[]; sizing: SizingConfig | null }
+
+/** What is wrong with a config, by place: `strategy`, `market`, `param:<name>`, `rules`, `rule:<index>`, `sizing`. */
 export type ConfigErrors = Record<string, string>
 export const paramKey = (name: string) => `param:${name}`
 export const ruleKey = (index: number) => `rule:${index}`
+export const SIZING_KEY = 'sizing'
 
 /** Separates rules in one value on the bot's side (TradingRule.Separator), so one rule cannot hold it. */
 const RULE_SEPARATOR = ';'
@@ -31,6 +35,26 @@ export function grammarOf(definition: StrategyDefinition | undefined): RuleGramm
 export const defaultParams = (definition: StrategyDefinition) => Object.fromEntries(definition.parameters.map((p) => [p.name, String(p.default)]))
 export const defaultRules = (definition: StrategyDefinition) => [...(definition.rules?.defaults ?? [])]
 
+/** `percent:25` as a config; null for text that is not METHOD or METHOD:VALUE. */
+export function readSizing(text: string | null | undefined): SizingConfig | null {
+  const match = /^([a-z]+)(?::(.+))?$/i.exec((text ?? '').trim())
+  return match ? { method: match[1]!.toLowerCase(), value: match[2] ?? '' } : null
+}
+
+/** The sizing the bot uses when none is sent, with the value written out (`kelly` alone is its default share). */
+export function defaultSizing(catalog: SizingCatalog | null): SizingConfig | null {
+  const read = readSizing(catalog?.default)
+  if (!catalog || !read) return null
+  const method = catalog.methods.find((m) => m.name === read.method)
+  return { method: read.method, value: read.value || String(method?.value.default ?? '') }
+}
+
+/** The sizing of a method chosen in the form: its default value. */
+export function sizingFor(catalog: SizingCatalog, name: string): SizingConfig {
+  const method = catalog.methods.find((m) => m.name === name)
+  return { method: name, value: method ? String(method.value.default) : '' }
+}
+
 export const storedMarkets = (markets: MarketRow[]) => markets.filter((m) => m.interval).map((m) => `${m.symbol} ${m.interval}`)
 
 /** The market to start from: the one asked for, else the strategy's own, else the first stored one. */
@@ -44,27 +68,34 @@ function marketFor(definition: StrategyDefinition, markets: MarketRow[], preferr
 export function initialConfig(definitions: StrategyDefinition[], markets: MarketRow[], preferred?: { symbol?: string | null; interval?: string | null; strategy?: string | null }): StrategyConfig | null {
   const definition = definitions.find((d) => d.name === preferred?.strategy) ?? definitions[0]
   if (!definition) return null
-  return { strategy: definition.name, market: marketFor(definition, markets, preferred), params: defaultParams(definition), rules: defaultRules(definition) }
+  return { strategy: definition.name, market: marketFor(definition, markets, preferred), params: defaultParams(definition), rules: defaultRules(definition), sizing: defaultSizing(definition.sizing) }
 }
 
-/** Another strategy: its defaults, on the same market. */
+/** Another strategy: its defaults, on the same market, sized as before (sizing is the session's, not the strategy's). */
 export const withStrategy = (config: StrategyConfig, definition: StrategyDefinition): StrategyConfig => ({
   ...config,
   strategy: definition.name,
   params: defaultParams(definition),
   rules: defaultRules(definition),
+  sizing: definition.sizing ? (config.sizing ?? defaultSizing(definition.sizing)) : null,
 })
 
 /**
  * A saved setup applied to the strategy as the bot describes it now: parameters it no longer has are dropped (and
- * named), new ones take their defaults, and rules are kept only by a strategy that has rules.
+ * named), new ones take their defaults, rules are kept only by a strategy that has rules, and the setup's sizing is
+ * used by a bot that sizes (a setup saved before sizing keeps the current one).
  */
-export function applySetup(config: StrategyConfig, setup: Pick<StrategyConfig, 'strategy' | 'params' | 'rules'>, definition: StrategyDefinition): { config: StrategyConfig; dropped: string[] } {
+export function applySetup(
+  config: StrategyConfig,
+  setup: Pick<StrategyConfig, 'strategy' | 'params' | 'rules'> & { sizing?: SizingConfig | null },
+  definition: StrategyDefinition,
+): { config: StrategyConfig; dropped: string[] } {
   const known = new Set(definition.parameters.map((p) => p.name))
   const dropped = Object.keys(setup.params).filter((name) => !known.has(name))
   const params = { ...defaultParams(definition), ...Object.fromEntries(Object.entries(setup.params).filter(([name]) => known.has(name))) }
   const rules = definition.rules ? (setup.rules.length ? [...setup.rules] : defaultRules(definition)) : []
-  return { config: { ...config, strategy: definition.name, params, rules }, dropped }
+  const sizing = definition.sizing ? (setup.sizing ?? config.sizing ?? defaultSizing(definition.sizing)) : null
+  return { config: { ...config, strategy: definition.name, params, rules, sizing }, dropped }
 }
 
 export const usesDefaultRules = (config: StrategyConfig, definition: StrategyDefinition) =>
@@ -86,6 +117,8 @@ export function validateConfig(config: StrategyConfig, definition: StrategyDefin
     else if (value < parameter.min || value > parameter.max) errors[paramKey(parameter.name)] = `${parameter.name} must be between ${parameter.min} and ${parameter.max}.`
     else if (parameter.whole && !Number.isInteger(value)) errors[paramKey(parameter.name)] = `${parameter.name} must be a whole number.`
   }
+  const sizingError = validateSizing(config.sizing, definition.sizing)
+  if (sizingError) errors[SIZING_KEY] = sizingError
   if (!definition.rules) return errors
   if (!config.rules.length) errors.rules = 'Add at least one rule, or reset them to the defaults.'
   const grammar = grammarOf(definition)
@@ -97,7 +130,22 @@ export function validateConfig(config: StrategyConfig, definition: StrategyDefin
   return errors
 }
 
-/** What the commands send. Rules go only to a strategy that has them, and always in full, so a run says exactly what it did. */
+/** The sizing's value checked against its method's range in the catalog; nothing to check on a bot without sizing. */
+function validateSizing(sizing: SizingConfig | null, catalog: SizingCatalog | null): string | null {
+  if (!catalog) return null
+  const method = catalog.methods.find((m) => m.name === sizing?.method)
+  if (!sizing || !method) return 'Choose a position sizing.'
+  const text = sizing.value.trim()
+  const value = Number(text)
+  if (text === '' || Number.isNaN(value)) return `${method.value.name} must be a number.`
+  if (value < method.value.min || value > method.value.max) return `${method.value.name} must be between ${method.value.min} and ${method.value.max}.`
+  return null
+}
+
+/**
+ * What the commands send. Rules go only to a strategy that has them, and always in full, so a run says exactly what it
+ * did; the sizing likewise, as `METHOD:VALUE`, only to a bot that sizes.
+ */
 export function toInput(config: StrategyConfig, definition: StrategyDefinition | undefined): StrategyInput {
   const [symbol = '', interval = ''] = config.market.split(' ')
   return {
@@ -106,16 +154,38 @@ export function toInput(config: StrategyConfig, definition: StrategyDefinition |
     interval,
     params: Object.fromEntries(Object.entries(config.params).map(([name, text]) => [name, Number(text)])),
     rules: definition?.rules ? config.rules.map((rule) => rule.trim().replace(/\s+/g, ' ')) : [],
+    ...(definition?.sizing && config.sizing ? { sizing: `${config.sizing.method}:${plainNumber(Number(config.sizing.value))}` } : {}),
   }
 }
 
-/** A run's input back as a config, to run again or change (a run saved before rules has none: the defaults apply). */
+/** A run's input back as a config, to run again or change (a run saved before rules or sizing has none: the defaults apply). */
 export const configFromInput = (input: StrategyInput): StrategyConfig => ({
   strategy: input.strategy,
   market: `${input.symbol} ${input.interval}`,
   params: Object.fromEntries(Object.entries(input.params).map(([name, value]) => [name, String(value)])),
   rules: [...(input.rules ?? [])],
+  sizing: readSizing(input.sizing),
 })
+
+/**
+ * A sizing as sent (`kelly:50`) in words, for confirmations: "50% of the balance per position", "Kelly: 50% of the Kelly
+ * percent of the balance, …". A method the app does not know is shown by its catalog title.
+ */
+export function describeSizing(sizing: string | undefined, catalog: SizingCatalog | null): string {
+  if (!catalog || !sizing) return '50% of the balance per position (this bot cannot size otherwise)'
+  const read = readSizing(sizing)
+  const value = read?.value ?? ''
+  switch (read?.method) {
+    case 'percent':
+      return `${value}% of the balance per position`
+    case 'fixed':
+      return `${value} of the account’s currency per position`
+    case 'kelly':
+      return `Kelly: ${Number(value) >= 100 ? 'the full Kelly percent' : `${value}% of the Kelly percent`} of the balance, from a backtest of this setup`
+    default:
+      return `${catalog.methods.find((m) => m.name === read?.method)?.title ?? read?.method ?? sizing}: ${value}`
+  }
+}
 
 /** "depth=23 deviation=1 moving-count=2", for confirmations. */
 export const describeParams = (input: StrategyInput) => Object.entries(input.params).map(([name, value]) => `${name}=${value}`).join(' ')

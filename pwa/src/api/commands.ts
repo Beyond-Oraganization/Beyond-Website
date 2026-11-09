@@ -19,6 +19,8 @@ export type StrategyInput = {
   params: Record<string, number>
   /** The rules, in the order they are tried; none means the strategy's defaults. */
   rules?: string[]
+  /** How big each position is, as `--sizing` takes it (`percent:25`, `fixed:500`, `kelly:50`); none means the bot's default. */
+  sizing?: string
 }
 
 /** Invariant decimal without grouping or exponent: what `decimal.TryParse(…, InvariantCulture)` reads. */
@@ -44,6 +46,9 @@ const strategyArgs = ({ strategy, symbol, interval, params, rules = [] }: Strate
   ...rules.flatMap((rule) => ['--rule', rule]),
   '-d',
 ]
+
+/** `--sizing` for the commands that size positions (backtest, trading start); `signal` has no such option. */
+const sizingArgs = ({ sizing }: StrategyInput) => (sizing ? ['--sizing', sizing] : [])
 
 const credentialArgs = (credentials: [string, string][]) => credentials.flatMap(([key, value]) => ['--credential', `${key}=${value}`])
 
@@ -109,20 +114,22 @@ export const cmd = {
   backtest: (input: StrategyInput, { balance, from, to }: { balance?: number; from?: Date | number | null; to?: Date | number | null } = {}) => [
     'backtest',
     ...strategyArgs(input),
+    ...sizingArgs(input),
     ...(balance != null ? ['--balance', plainNumber(balance)] : []),
     ...(from != null ? ['--from', utcArg(from)] : []),
     ...(to != null ? ['--to', utcArg(to)] : []),
   ],
 
   /**
-   * Starts a strategy session. `name` names it (several can trade one market; a running session of that name is
-   * replaced); without one the bot names it after the strategy. On a live account, `live` confirms trading real
-   * money (--live) after the app's own confirmation.
+   * Starts a strategy session, sized as `input.sizing` says. `name` names it (several can trade one market; a running
+   * session of that name is replaced); without one the bot names it after the strategy. On a live account, `live`
+   * confirms trading real money (--live) after the app's own confirmation.
    */
   tradingStart: (input: StrategyInput, live = false, name?: string | null) => [
     'trading',
     'start',
     ...strategyArgs(input),
+    ...sizingArgs(input),
     ...(name ? ['--name', name] : []),
     ...(live ? ['--live'] : []),
   ],
