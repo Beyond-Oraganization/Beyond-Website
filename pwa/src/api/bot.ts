@@ -134,15 +134,29 @@ export function useCommand<T>(
       if (options.fallback?.when(outcome)) outcome = await queue!.run(options.fallback.args, { priority: options.priority ?? 'view', signal })
       if (!ok(outcome, options.accept ?? [])) throw new CommandFailure(outcome)
       const data: CommandData<T> = { result: outcome.result, parsed: parse(outcome.result), at: Date.now(), roundTripMs: outcome.roundTripMs }
-      if (options.persist && connection) void db.set(`cache:${connection.id}:${name}`, { key: queryKey(connection.id, name, args!), data })
+      if (options.persist && connection) void rememberAnswer(connection.id, name, args!, data)
       return data
     },
   })
 }
 
-/** Puts the answers this device remembered for a bot back in the cache (shown under "as of …" when offline). */
+/** An answer kept on this device, already read, with the app version that read it. */
+type RememberedAnswer = { key: unknown[]; data: CommandData<unknown>; appVersion?: string }
+
+/** Keeps a bot's answer on this device for starting offline. */
+export function rememberAnswer<T>(connectionId: string, name: string, args: string[], data: CommandData<T>): Promise<void> {
+  const remembered: RememberedAnswer = { key: queryKey(connectionId, name, args), data, appVersion: __APP_VERSION__ }
+  return db.set(`cache:${connectionId}:${name}`, remembered)
+}
+
+/**
+ * Puts the answers this device remembered for a bot back in the cache (shown under "as of …" when offline). Only
+ * those read by this app version come back: an older one read them without the fields it did not know yet (the
+ * strategy catalog's position sizing), and putting them back would hide those fields until the next refresh.
+ */
 export async function restoreCache(connectionId: string) {
-  for (const [, saved] of await db.prefixed<{ key: unknown[]; data: CommandData<unknown> }>(`cache:${connectionId}:`)) {
+  for (const [, saved] of await db.prefixed<RememberedAnswer>(`cache:${connectionId}:`)) {
+    if (saved.appVersion !== __APP_VERSION__) continue
     if (!queryClient.getQueryData(saved.key)) queryClient.setQueryData(saved.key, saved.data, { updatedAt: saved.data.at })
   }
 }

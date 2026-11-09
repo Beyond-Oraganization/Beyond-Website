@@ -3,6 +3,7 @@ import { useEffect, useId, useState, type FormEvent } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { restoreCache, useBot, useBotHealth, useBusy } from '../api/bot.ts'
+import { checkForUpdates } from './updates.ts'
 import { describedBy, Field } from '../components/Field.tsx'
 import { BotMark, Icon } from '../components/Icon.tsx'
 import { Sheet } from '../components/Sheet.tsx'
@@ -202,7 +203,12 @@ function UpdatePrompt() {
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
-  } = useRegisterSW({ immediate: true })
+  } = useRegisterSW({
+    immediate: true,
+    onRegisteredSW: (_url, registration) => {
+      if (registration) checkForUpdates(registration)
+    },
+  })
   const busy = useBusy()
   if (!needRefresh) return null
   return (
