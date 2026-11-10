@@ -128,7 +128,7 @@ GENERATED_NOTE = f"<!-- {GENERATED_MARK} from site.config.json. Edit the config,
 SYNCED_NOTE = "<!-- The head, header and footer of this page are kept in step by the Beyondia site manager (bm build). The content between them is written by hand. -->"
 DESCRIPTION_LIMIT = 160
 SHARE_IMAGE = "og-image.png"
-SHARE_IMAGE_ALT = "Beyondia: eight arrows converging on an eye"
+SHARE_IMAGE_ALT = "Beyondia: eight arrows converging on a face"
 
 
 def describe(text: str, limit: int = DESCRIPTION_LIMIT) -> str:

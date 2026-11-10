@@ -79,7 +79,7 @@ ul,ol{list-style:none}
 .rows>li::before,.pr::before,.contact li::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:var(--line2);transform-origin:0 50%}
 .pills{display:flex;flex-wrap:wrap;gap:8px}
 .pill{display:inline-block;padding:4px 12px;border:2px solid var(--line2);font:700 12px/1.4 var(--f-t);letter-spacing:.1em;text-transform:uppercase}
-.btn{display:inline-flex;align-items:center;min-height:56px;padding:0 32px;border:3px solid var(--fg);font:700 14px/1 var(--f-t);letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.btn{display:inline-flex;align-items:center;gap:14px;min-height:56px;padding:0 32px;border:3px solid var(--fg);font:700 14px/1 var(--f-t);letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
 .btn-solid{background:var(--fg);color:var(--bg)}
 .btn-solid:hover{background:color-mix(in srgb,var(--fg) 84%,var(--bg));opacity:1;transform:translate(-3px,-3px);box-shadow:5px 5px 0 var(--line)}
 .btn-ghost{background:transparent;color:var(--fg)}
@@ -134,9 +134,9 @@ ul,ol{list-style:none}
 
 /* ---------- motion ---------- */
 .btn,.tile,.pager a,.nav a,.pill,.lane,.rules li{transition:transform .28s var(--ease),box-shadow .28s var(--ease),background-color .22s var(--ease),color .22s var(--ease)}
-.more svg,.pager .small{transition:transform .28s var(--ease)}
+.more svg,.btn svg,.pager .small{transition:transform .28s var(--ease)}
 .more:hover,.tile:hover .more,.pager a:hover .more{opacity:1}
-.more:hover svg,.tile:hover .more svg{transform:translateX(8px)}
+.more:hover svg,.btn:hover svg,.tile:hover .more svg{transform:translateX(8px)}
 .lane:hover{transform:translateY(-4px);box-shadow:0 6px 0 var(--line2)}
 .rules li:hover{background:color-mix(in srgb,var(--fg) 6%,transparent)}
 .pill:hover{background:color-mix(in srgb,var(--fg) 10%,transparent)}
@@ -159,6 +159,9 @@ ul,ol{list-style:none}
   @keyframes look{0%,38%,100%{transform:translateX(0)}48%,66%{transform:translateX(2px)}78%,90%{transform:translateX(-2px)}}
   @keyframes spin{to{transform:rotate(360deg)}}
   @keyframes ringin{from{opacity:0;transform:scale(.88)}to{opacity:1;transform:none}}
+  @keyframes pull{0%,100%{transform:none}50%{transform:translateY(7px)}}
+  @keyframes ringdraw{from{stroke-dasharray:1 1;stroke-dashoffset:1}to{stroke-dasharray:1 1;stroke-dashoffset:0}}
+  @keyframes smile{0%,84%,100%{transform:none}89%,95%{transform:scaleX(1.08) translateY(-.8px)}}
 
   .page{animation:fadein .5s ease-out both}
   .crumbs{animation:fadein .6s var(--ease) both}
@@ -170,21 +173,25 @@ ul,ol{list-style:none}
   .ticker-track{animation:marquee 46s linear infinite}
   .ticker:hover .ticker-track{animation-play-state:paused}
 
-  /* hero: the arrows converge, the eye opens and then blinks now and then */
+  /* hero: the arrows converge and keep pulling inward in a wave, the circle draws itself, the face opens its eyes,
+     then blinks, looks around and smiles now and then */
   .hero-copy>*{animation:rise .9s var(--ease) both}
   .hero-copy>:nth-child(1){animation-delay:.9s}
   .hero-copy>:nth-child(2){animation-delay:1s}
   .hero-copy>:nth-child(3){animation-delay:1.1s}
   .hero-copy>:nth-child(4){animation-delay:1.2s}
-  .arws .arw{animation:converge 1.1s var(--ease) both}
-  .arws g:nth-child(2) .arw{animation-delay:.06s}
-  .arws g:nth-child(3) .arw{animation-delay:.12s}
-  .arws g:nth-child(4) .arw{animation-delay:.18s}
-  .arws g:nth-child(5) .arw{animation-delay:.24s}
-  .arws g:nth-child(6) .arw{animation-delay:.3s}
-  .arws g:nth-child(7) .arw{animation-delay:.36s}
-  .arws g:nth-child(8) .arw{animation-delay:.42s}
-  .eye{transform-box:fill-box;transform-origin:center;animation:eyeopen .8s var(--ease) .7s both,blink 7s ease-in-out 3.5s infinite}
+  .arws .arw{animation:converge 1.1s var(--ease) both,pull 4s ease-in-out 2s infinite}
+  .arws g:nth-child(2) .arw{animation-delay:.06s,2.5s}
+  .arws g:nth-child(3) .arw{animation-delay:.12s,3s}
+  .arws g:nth-child(4) .arw{animation-delay:.18s,3.5s}
+  .arws g:nth-child(5) .arw{animation-delay:.24s,4s}
+  .arws g:nth-child(6) .arw{animation-delay:.3s,4.5s}
+  .arws g:nth-child(7) .arw{animation-delay:.36s,5s}
+  .arws g:nth-child(8) .arw{animation-delay:.42s,5.5s}
+  .ring{animation:ringdraw 1.3s var(--ease) .45s backwards}
+  .face{animation:fadein .7s ease-out .9s both}
+  .eye{transform-box:fill-box;transform-origin:center;animation:eyeopen .8s var(--ease) 1.1s both,blink 7s ease-in-out 4s infinite}
+  .lips{transform-box:fill-box;transform-origin:center;animation:smile 9s ease-in-out 5s infinite}
   .pupil{animation:look 10s ease-in-out 4s infinite}
   .rings circle{transform-box:fill-box;transform-origin:center;animation:ringin 1.8s var(--ease) both}
   .rings circle:nth-of-type(2){animation:ringin 1.8s var(--ease) .1s both,spin 180s linear infinite}
@@ -195,6 +202,10 @@ ul,ol{list-style:none}
   .rings .rays{animation:fadein 2s ease-out .6s both}
   .eye-only .eye{animation:blink 8s ease-in-out 2s infinite}
   .eye-only .pupil{animation:look 11s ease-in-out 3s infinite}
+  /* the small symbol in the header and footer blinks now and then, and leans in on hover */
+  .logo-eyes{transform-box:fill-box;transform-origin:center;animation:blink 9s ease-in-out 6s infinite}
+  .brand svg{transition:transform .5s var(--ease)}
+  .brand:hover svg{transform:scale(1.08)}
 }
 
 /* scroll-driven reveals: content is visible by default, browsers without support just show it */
