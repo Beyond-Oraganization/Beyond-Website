@@ -162,6 +162,24 @@ export async function restoreCache(connectionId: string) {
 }
 
 /**
+ * Reads from the bot for work this device does with the answer (candle pages, the Kelly basis): ahead of the
+ * screens' reads like an action, but it changes nothing on the bot, so nothing is refreshed after it. It throws a
+ * CommandFailure carrying the bot's message and hint, and never retries.
+ */
+export function useRead() {
+  const { connection, queue } = useBot()
+  return useCallback(
+    async (args: string[], signal?: AbortSignal): Promise<CommandResult> => {
+      if (!queue || !connection) throw new CommandFailure({ kind: 'unreachable', reason: 'No bot is connected.' })
+      const outcome = await queue.run(args, { priority: 'interactive', signal })
+      if (!ok(outcome, [])) throw new CommandFailure(outcome)
+      return outcome.result
+    },
+    [connection, queue],
+  )
+}
+
+/**
  * Runs an action (orders, trading, markets, logins) ahead of every read, then refreshes what it changed. It
  * throws a CommandFailure carrying the bot's message and hint. It never retries.
  */

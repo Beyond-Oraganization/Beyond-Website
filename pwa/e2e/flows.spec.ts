@@ -101,15 +101,29 @@ test('adds a market: the busy state, a cancel, and Resume', async ({ page }) => 
   await expect(shown(page.getByRole('link', { name: 'EURPLN 1h', exact: true }))).toBeVisible()
 })
 
-test('backtests, draws the balance over time and keeps the run', async ({ page }) => {
+test('backtests on this device with the bot’s engine: the balance, the trade returns, the Monte Carlo, and the run kept', async ({ page }) => {
   await connected(page)
   await page.goto('#/backtest')
   await page.getByRole('button', { name: 'Run the backtest' }).click()
+  // The first run copies the market's candles and starts the engine (WebAssembly, in a worker).
+  await expect(page.getByRole('heading', { name: 'Monte Carlo' })).toBeVisible({ timeout: 60_000 })
   await expect(page.getByText('Profit / loss').first()).toBeVisible()
-  await page.getByRole('button', { name: 'Draw the balance over time' }).click()
-  await expect(page.getByRole('img', { name: /^Balance from/ })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('img', { name: /^Balance from/ })).toBeVisible()
+  await expect(page.getByRole('img', { name: /^Returns of \d+ trades/ })).toBeVisible()
+  await expect(page.getByRole('img', { name: /^1,000 simulated balance paths/ })).toBeVisible()
+  await expect(page.getByText(/of 1,000 paths ended above the starting balance/)).toBeVisible()
+  await expect(page.getByText('All figures')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Saved runs' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Show' }).first()).toBeVisible()
+  // A second run asks the bot only for the candles from the newest one on.
+  await page.getByRole('button', { name: 'Run the backtest' }).click()
+  await expect(page.getByRole('button', { name: 'Show' }).nth(1)).toBeVisible({ timeout: 30_000 })
+  // The copy shows in Settings, where it can be cleared.
+  await page.goto('#/settings')
+  const copies = page.getByRole('heading', { name: 'Candles for backtests' }).locator('..')
+  await expect(shown(copies.getByText('XAUUSD 1h'))).toBeVisible()
+  await shown(copies.getByRole('button', { name: 'Clear' })).click()
+  await expect(copies.getByText('None yet.')).toBeVisible()
 })
 
 test('backtests rules of its own, built from the strategy’s syntax, and shows the bot’s message for a band it has not got', async ({ page }) => {
@@ -125,22 +139,23 @@ test('backtests rules of its own, built from the strategy’s syntax, and shows 
   await second.getByRole('combobox', { name: 'Rule 2: lower or upper' }).selectOption('upper')
   await expect(page.getByText('Your rules', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Run the backtest' }).click()
-  await expect(page.getByRole('list').filter({ hasText: 'open short on cross down upper 1' }).first()).toBeVisible()
+  await page.getByText('All figures').click()
+  await expect(page.getByText('open short on cross down upper 1; close short on cross up upper 1').first()).toBeVisible({ timeout: 60_000 })
   await first.getByRole('spinbutton').fill('3')
   await page.getByRole('button', { name: 'Run the backtest' }).click()
   await expect(page.getByText(/upper 3 is not a band of the envelope/).first()).toBeVisible()
 })
 
-test('backtests with a fixed amount, and shows the sizing, the Kelly percent and the stored backtest', async ({ page }) => {
+test('backtests with a fixed amount, and shows the sizing and this run’s Kelly among all the figures', async ({ page }) => {
   await connected(page)
   await page.goto('#/backtest')
   await page.getByRole('combobox', { name: 'Position sizing' }).selectOption('fixed')
   await page.getByLabel("Amount each position is worth, in the account's currency").fill('500')
   await page.getByRole('button', { name: 'Run the backtest' }).click()
-  const sizing = page.locator('.tile', { hasText: 'Sizing' })
-  await expect(sizing).toContainText('500.00')
-  await expect(sizing).toContainText(/per position · stored as backtest #\d+/)
-  await expect(page.locator('.tile', { hasText: 'Kelly' })).toContainText(/win rate/)
+  await page.getByText('All figures').click({ timeout: 60_000 })
+  const figures = page.locator('details', { hasText: 'All figures' })
+  await expect(figures.locator('dd').filter({ hasText: '500.00 per position' })).toBeVisible()
+  await expect(figures.locator('dt', { hasText: 'Kelly of this run' })).toBeVisible()
 })
 
 test('starts a session sized by Kelly after confirming it, names the backtest behind it, and shows the bot’s refusal without an edge', async ({ page }) => {

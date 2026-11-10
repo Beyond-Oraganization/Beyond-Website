@@ -1,10 +1,14 @@
+import { useEffect, useState } from 'react'
 import { queryClient, useBot } from '../api/bot.ts'
+import { DataTable } from '../components/DataTable.tsx'
 import { Segmented } from '../components/Field.tsx'
 import { ScreenHead } from '../components/ScreenHead.tsx'
 import { toast } from '../components/Toasts.tsx'
 import { Button, Callout, Section } from '../components/ui.tsx'
 import { InstallHelp } from '../install/InstallHelp.tsx'
 import { useInstall } from '../install/install.ts'
+import { deleteCopy, listCopies, type CopyInfo } from '../data/candles.ts'
+import { fmtBytes, fmtCount, fmtRelative, fmtTime } from '../format.ts'
 import { db } from '../state/db.ts'
 import { useLogs } from '../state/logs.ts'
 import { useSettings } from '../state/settings.ts'
@@ -16,6 +20,15 @@ export default function Settings() {
   const { standalone } = useInstall()
   const { connection } = useBot()
   const clearLog = useLogs((state) => state.clear)
+  const [copies, setCopies] = useState<CopyInfo[] | null>(null)
+  useEffect(() => {
+    if (connection) void listCopies(connection.id).then(setCopies)
+  }, [connection])
+  const forget = async (markets: string[]) => {
+    if (!connection) return
+    for (const market of markets) await deleteCopy(connection.id, market)
+    setCopies(await listCopies(connection.id))
+  }
   const themeValue = followSystem ? 'system' : theme
 
   const askNotifications = async (on: boolean) => {
@@ -62,14 +75,6 @@ export default function Settings() {
             options={[2, 5, 10, 30, 60].map((n) => ({ value: String(n), label: `${n} s` }))}
             hint="Only while the app is visible and online. Prices move only while something reads the session, so faster means fresher prices."
           />
-          <Segmented
-            name="samples"
-            legend="Balance curve points"
-            value={String(settings.equitySamples)}
-            onChange={(value) => void settings.change({ equitySamples: Number(value) })}
-            options={[6, 12, 24, 48].map((n) => ({ value: String(n), label: String(n) }))}
-            hint="Each point is one more backtest (about a third of a second on the bot)."
-          />
         </div>
       </Section>
       <Section variant="alt" label="Notifications and security">
@@ -92,6 +97,31 @@ export default function Settings() {
       <Section label="Data on this device">
         <div className="stack">
           <p className="p">This device remembers the last answers (to start offline), the ticks it saw, your saved backtests and what it asked the bot.</p>
+          <div className="stack-sm">
+            <h2 className="h3">Candles for backtests</h2>
+            <p className="hint">Copied from the bot the first time you backtest a market, then brought up to date before each backtest. Clearing one costs a download the next time.</p>
+            {copies?.length ? (
+              <DataTable
+                caption="Candle copies on this device"
+                rows={copies}
+                rowKey={(copy) => copy.market}
+                columns={[
+                  { key: 'market', header: 'Market', card: 'title', render: (copy) => copy.market },
+                  { key: 'candles', header: 'Candles', align: 'right', card: 'sub', render: (copy) => fmtCount(copy.count) },
+                  { key: 'range', header: 'From → to (UTC)', render: (copy) => `${fmtTime(copy.first)} → ${fmtTime(copy.newest)}` },
+                  { key: 'size', header: 'Size', align: 'right', render: (copy) => fmtBytes(copy.bytes) },
+                  { key: 'updated', header: 'Updated', render: (copy) => fmtRelative(copy.updatedAt) },
+                ]}
+                actions={(copy) => (
+                  <Button compact variant="ghost" onClick={() => void forget([copy.market])}>
+                    Clear
+                  </Button>
+                )}
+              />
+            ) : (
+              <p className="p mute">{copies ? 'None yet.' : connection ? 'Reading…' : 'Connect a bot to see them.'}</p>
+            )}
+          </div>
           <div className="btn-row">
             <Button
               variant="ghost"
@@ -108,6 +138,20 @@ export default function Settings() {
             </Button>
             <Button variant="ghost" disabled={!connection} onClick={() => connection && clearLog(connection.id, 'activity')}>
               Clear the activity log
+            </Button>
+            <Button variant="ghost" disabled={!copies?.length} onClick={() => void forget(copies?.map((copy) => copy.market) ?? [])}>
+              Clear every candle copy
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={!connection}
+              onClick={async () => {
+                if (!connection) return
+                await db.del(`backtests:${connection.id}`)
+                toast.info('Cleared', 'Saved backtests are gone from this device.')
+              }}
+            >
+              Clear the saved backtests
             </Button>
           </div>
         </div>

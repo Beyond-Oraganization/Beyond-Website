@@ -158,6 +158,35 @@ body:has(dialog[open]){overflow:hidden}
 .chart-legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:10px;font:700 12px/1.4 var(--f-t);letter-spacing:.08em;text-transform:uppercase}
 .chart-legend i{display:inline-block;width:18px;height:4px;margin-right:8px;vertical-align:middle;background:currentColor}
 .chart-legend i.dash{background:repeating-linear-gradient(90deg,currentColor 0 5px,transparent 5px 9px)}
+.chart-legend i.thin{height:1px;opacity:.5}
+.chart-legend i.thick{height:5px}
+.chart-legend i.sq{width:12px;height:12px}
+.chart-legend i.sq.gain{background:var(--gain)}
+.chart-legend i.sq.mute{background:var(--mute)}
+.chart-legend i.sq.hatch{background:repeating-linear-gradient(-45deg,var(--loss) 0 3px,color-mix(in srgb,var(--loss) 55%,var(--bg)) 3px 5px)}
+.chart-legend i.dot{width:12px;height:12px;border-radius:50%;box-shadow:0 0 0 2px var(--bg) inset}
+
+/* ---------- backtest charts: SVG on the section's tokens; the Monte Carlo paths on a canvas under it ---------- */
+.chart-box{position:relative;width:100%;min-width:0;max-width:100%;overflow:hidden;border:4px solid var(--line2);background:var(--bg);font:500 11px/1 var(--f-t)}
+.chart-box>svg{display:block;overflow:visible}
+.chart-box.mc>canvas,.chart-box.mc>svg{position:absolute;inset:0}
+.chart-box .grid{stroke:var(--line);stroke-width:1}
+.chart-box .axis{stroke:var(--fg);stroke-width:2}
+.chart-box .tick{fill:var(--mute);font:500 11px/1 var(--f-t);font-variant-numeric:tabular-nums}
+.chart-box .tick.strong{fill:var(--fg);font-weight:700;paint-order:stroke;stroke:var(--bg);stroke-width:4px;stroke-linejoin:round} /* a halo: labels sit on bars and paths */
+.chart-box .zero{stroke:var(--fg);stroke-width:2}
+.chart-box .average{stroke:var(--fg);stroke-width:1.5;stroke-dasharray:4 3}
+.chart-box .start{stroke:var(--fg);stroke-width:1;stroke-dasharray:2 3}
+.chart-box .own{fill:none;stroke:var(--fg);stroke-width:1.5;stroke-dasharray:6 4;stroke-linejoin:round}
+.chart-box .mean-halo{fill:none;stroke:var(--bg);stroke-width:7;stroke-linejoin:round;stroke-linecap:round}
+.chart-box .mean{fill:none;stroke:var(--fg);stroke-width:3.5;stroke-linejoin:round;stroke-linecap:round}
+.chart-box .connector{stroke:var(--fg);stroke-width:1;stroke-dasharray:1 3}
+.chart-box .mean-dot{fill:var(--fg);stroke:var(--bg);stroke-width:2.5}
+.chart-box .cross{stroke:var(--fg);stroke-width:1;pointer-events:none}
+.chart-tip{position:absolute;z-index:2;display:grid;gap:4px;width:max-content;max-width:220px;padding:8px 10px;border:3px solid var(--fg);background:var(--bg);color:var(--fg);font:500 12px/1.35 var(--f-t);pointer-events:none;box-shadow:4px 4px 0 var(--fg)}
+.chart-tip strong{font-weight:700}
+.big-figure{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px}
+.big-figure .value{font:400 clamp(44px,8cqw,84px)/1 var(--f-d);letter-spacing:-.01em}
 
 /* ---------- key figures band ---------- */
 .figures{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:20px 32px}

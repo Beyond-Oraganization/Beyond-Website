@@ -21,6 +21,8 @@ const intervalError = (text) =>
 const WEEKEND = new Set(['XAUUSD', 'XAGUSD', 'XAUTUSDT', 'XAGUSDT', 'EURPLN', 'EURUSD'])
 const isWeekend = (ms) => [0, 6].includes(new Date(ms).getUTCDay())
 const HISTORY_START = Date.UTC(2019, 0, 1)
+/** The bot version this mock answers as (Directory.Build.props): the app compares it with its engine's. */
+const VERSION = '2.1.0'
 const HELP_HINT = 'Run the command with --help to see its arguments and options.'
 const BROKER_HINT = "Check the connection with 'status'; the log has the details."
 const SYMBOLS = {
@@ -513,7 +515,7 @@ export function createBot(options = {}) {
         }
       }),
       system: {
-        version: '2.0.0', processUptime: F.span(t - startedAt),
+        version: VERSION, processUptime: F.span(t - startedAt),
         broker: { isConnected: true, connectedSince: new Date(s.loginAt).toISOString(), lastLatency: F.span(38 + rand() * 20), lastError: null },
         database: s.databaseDown
           ? { isConnected: false, server: 'localhost:3306', database: 'BeyondBotDB', schemaVersion: 0, serverVersion: null, latency: F.span(1), error: 'Cannot reach MySQL at localhost:3306.' }
@@ -611,7 +613,7 @@ export function createBot(options = {}) {
           ['Database', s.databaseDown ? 'unavailable (Cannot reach MySQL at localhost:3306.)' : 'connected 3 ms, BeyondBotDB@localhost:3306, schema v2, MySQL 8.0.39'],
           ['Market data', snap.system.markets.length ? snap.system.markets.map((m) => `${m.market.symbol} ${parseInterval(m.market.interval).code} (${F.duration((Date.parse(snap.time) - Date.parse(m.newestOpenTime)) / 1000)} old)`).join(', ') : 'none loaded'],
           ['Memory', `${F.bytes(snap.system.managedMemoryBytes)} managed, ${F.bytes(snap.system.workingSetBytes)} working set`],
-          ['Version', `2.0.0, up ${F.duration((Date.parse(snap.time) - startedAt) / 1000)}`], ['Log', snap.system.logPath],
+          ['Version', `${VERSION}, up ${F.duration((Date.parse(snap.time) - startedAt) / 1000)}`], ['Log', snap.system.logPath],
         ]),
       )
   }
@@ -647,7 +649,7 @@ export function createBot(options = {}) {
       const { opt } = readArgs(argv, { '--json': {} })
       if (opt.json) {
         const accounts = (ctx.connection ? ctx.connection.accounts : [...s.open.values()].map((a) => a.login)).filter((l) => s.open.has(l.toLowerCase()))
-        const value = { version: '2.0.0', startedAt: new Date(startedAt).toISOString(), databaseConnected: !s.databaseDown, schemaVersion: s.databaseDown ? 0 : 3,
+        const value = { version: VERSION, startedAt: new Date(startedAt).toISOString(), databaseConnected: !s.databaseDown, schemaVersion: s.databaseDown ? 0 : 3,
           databaseError: s.databaseDown ? 'Cannot reach MySQL at localhost:3306.' : null, accounts: accounts.map((l) => describeAccount(l, l === s.user)) }
         o.text(JSON.stringify(value, null, 2))
         return s.databaseDown ? 1 : { json: value }
@@ -655,7 +657,7 @@ export function createBot(options = {}) {
       o.text('Checking…')
       o.section('Status', (x) =>
         x.grid([
-          ['Version', `2.0.0, up ${F.duration((now() - startedAt) / 1000)}`],
+          ['Version', `${VERSION}, up ${F.duration((now() - startedAt) / 1000)}`],
           ['Database', s.databaseDown ? 'unavailable (Cannot reach MySQL at localhost:3306.)' : 'connected in 3 ms: BeyondBotDB@localhost:3306, schema v2'],
           ['User', s.user ?? 'not logged in'], ['Broker', s.user ? `connected to ${users.get(s.user.toLowerCase())?.broker === 'Bybit' ? 'Bybit' : 'cTrader'} ${users.get(s.user.toLowerCase())?.mode === 'Live' ? 'LIVE' : 'DEMO'}` : 'connects after login'],
           ['Trading', `${s.sessions.size} strategy session(s)`], ['Credentials', '/var/lib/beyondbot/Credentials'], ['Log', snapshotLog()],
@@ -870,6 +872,30 @@ export function createBot(options = {}) {
       o.table(['Open (UTC)', 'Open', 'High', 'Low', 'Close', 'Volume'], candles.map((c) => [F.time(c.openTime), F.price(c.open), F.price(c.high), F.price(c.low), F.price(c.close), F.number(c.volume)]))
       o.text(`${candles.length} candles; --last, --from and --to choose others.`)
     },
+    // Cli/Commands/MarketCommands.cs CandlesExportCommand: a page of stored candles, oldest first, for a device's copy.
+    'candles export': (o, argv) => {
+      const { pos, opt } = readArgs(argv, { '--from': { value: true }, '--limit': { alias: '-n', value: true }, '--json': {} })
+      const symbol = (pos[0] ?? '').toUpperCase()
+      const interval = parseInterval(pos[1])
+      if (!interval) throw intervalError(pos[1])
+      const limit = Number(opt.limit ?? 5000)
+      if (!(Number.isInteger(limit) && limit >= 1 && limit <= 10000)) throw new Exit(1, `--limit takes 1 to 10,000 candles a page, not ${opt.limit}.`)
+      const market = s.markets.get(keyOf(symbol, interval.code))
+      if (!market?.candles.length) throw new Exit(1, `${symbol} ${interval.code} is not set up.`)
+      const from = opt.from ? Date.parse(opt.from.length <= 10 ? `${opt.from}T00:00:00Z` : `${opt.from.replace(/Z$/, '')}Z`) : null
+      const after = market.candles.filter((c) => from == null || c.openTime >= from)
+      const page = after.slice(0, limit)
+      const iso = (ms) => new Date(ms).toISOString().replace('.000Z', 'Z')
+      if (!opt.json) return o.text(['open_time,open,high,low,close,volume', ...page.map((c) => `${iso(c.openTime)},${c.open},${c.high},${c.low},${c.close},${c.volume}`)].join('\n'))
+      const json = {
+        market: { symbol, interval: interval.code },
+        first: iso(market.candles[0].openTime),
+        next: after[limit] ? iso(after[limit].openTime) : null,
+        candles: page.map((c) => [c.openTime / 1000, c.open, c.high, c.low, c.close, c.volume]),
+      }
+      o.text(JSON.stringify(json))
+      return { json }
+    },
     'candles oldest': (o, argv) => {
       const { pos } = readArgs(argv)
       requireLogin()
@@ -961,6 +987,19 @@ export function createBot(options = {}) {
       )
       o.text(describeParams(input.params, input.rules))
       o.text(`Stored as backtest #${stored.id}; 'backtests' lists them. Kelly sizing of this setup reads the newest one that starts at the first stored candle.`)
+    },
+    // Cli/Commands/StrategyCommands.cs KellyCommand: the sizing trading start --sizing kelly:N would use.
+    kelly: (o, argv) => {
+      const input = strategyInput(argv, { '--share': { value: true }, '--json': {} })
+      const choice = parseSizing(`kelly:${input.opt.share ?? 100}`)
+      const market = marketOrFail(input.symbol, input.interval)
+      const sizing = resolveSizing(choice, market, input.params, input.rules)
+      if (input.opt.json) {
+        o.text(JSON.stringify(sizing, null, 2))
+        return { json: sizing }
+      }
+      o.text(`drcs on ${market.symbol} ${market.interval.code}: ${sizingWords(sizing)}, from ${kellyBasisWords(sizing.kelly)}.`)
+      o.text(describeParams(input.params, input.rules))
     },
     backtests: (o, argv) => {
       const { pos, opt } = readArgs(argv, { '--symbol': { alias: '-s', value: true }, '--interval': { alias: '-i', value: true }, '--last': { alias: '-n', value: true }, '--json': {} })
