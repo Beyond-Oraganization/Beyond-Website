@@ -22,6 +22,7 @@
     "icons": "node scripts/icons.mjs",
     "screenshots": "node scripts/screenshots.mjs",
     "record-fixtures": "node scripts/record-fixtures.mjs",
+    "engine": "node scripts/engine.mjs",
     "format": "prettier --write ."
   },
   "dependencies": {

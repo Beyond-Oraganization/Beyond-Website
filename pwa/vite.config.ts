@@ -27,7 +27,13 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,woff2,svg,png,ico,webmanifest}'],
         // Only iOS reads the splash screens; the screenshots are for install dialogs.
-        globIgnores: ['**/apple-splash-*.png', 'screenshots/**'],
+        globIgnores: ['**/apple-splash-*.png', 'screenshots/**', 'engine/**'],
+        // The backtest engine (5 MB) is fetched the first time a backtest runs, not at install, then kept. Its
+        // framework files carry a hash in their names; dotnet.js and version.json do not, so they are asked for first.
+        runtimeCaching: [
+          { urlPattern: /\/engine\/(framework\/dotnet\.js|version\.json)$/, handler: 'NetworkFirst', options: { cacheName: 'engine-entry' } },
+          { urlPattern: /\/engine\/framework\//, handler: 'CacheFirst', options: { cacheName: 'engine', expiration: { maxEntries: 60 } } },
+        ],
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
         sourcemap: false,

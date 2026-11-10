@@ -1,0 +1,3 @@
+(function(){let e=null,t=self;async function n(e){let{dotnet:t}=await import(
+/* @vite-ignore */
+new URL(`framework/dotnet.js`,e).href),n=await t.create();return(await n.getAssemblyExports(n.getConfig().mainAssemblyName??`BeyondBot.Browser`)).BeyondBot.Browser.Engine}t.addEventListener(`message`,async({data:r})=>{let i=e=>t.postMessage(e);try{e??=n(r.base);let t=await e;if(r.kind===`version`)return i({id:r.id,value:t.Version()});let{time:a,open:o,high:s,low:c,close:l,volume:u}=r.candles;i({id:r.id,value:t.Backtest(r.request,Array.from(a),Array.from(o),Array.from(s),Array.from(c),Array.from(l),Array.from(u))})}catch(t){e=null,i({id:r.id,error:t instanceof Error?t.message:String(t)})}})})();

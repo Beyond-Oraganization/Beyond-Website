@@ -98,6 +98,20 @@ export const cmd = {
     ...(to != null ? ['--to', utcArg(to)] : []),
   ],
   candlesOldest: (symbol: string, interval: string) => ['candles', 'oldest', symbol, interval],
+  /**
+   * A page of stored candles, oldest first, from `from` (the first stored when null): how this device copies a
+   * market's history to backtest it (bot 2.1.0 or later).
+   */
+  candlesExport: (symbol: string, interval: string, from: Date | number | null, limit = 5000) => [
+    'candles',
+    'export',
+    symbol,
+    interval,
+    '--limit',
+    String(limit),
+    ...(from != null ? ['--from', utcArg(from)] : []),
+    '--json',
+  ],
   indicatorsShow: (symbol: string, interval: string, { depth, last }: { depth?: number; last?: number } = {}) => [
     'indicators',
     'show',
@@ -119,6 +133,12 @@ export const cmd = {
     ...(from != null ? ['--from', utcArg(from)] : []),
     ...(to != null ? ['--to', utcArg(to)] : []),
   ],
+
+  /**
+   * The Kelly sizing the bot would trade the setup with, `share` percent of Kelly (bot 2.1.0 or later): a device
+   * backtest with Kelly sizing sizes by it, as live trading would.
+   */
+  kelly: (input: StrategyInput, share: number) => ['kelly', ...strategyArgs(input), '--share', plainNumber(share), '--json'],
 
   /**
    * Starts a strategy session, sized as `input.sizing` says. `name` names it (several can trade one market; a running

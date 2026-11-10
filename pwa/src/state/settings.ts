@@ -8,13 +8,13 @@ export type Settings = {
   notifications: boolean
   /** Passphrase keys are forgotten after the app has been in the background this long. */
   autoLockMinutes: number
-  /** Extra backtests for the "balance over time" curve. */
-  equitySamples: number
+  /** Which closed-by-default panels were left open (the Backtest page's figure tables), by name. */
+  openPanels: Record<string, boolean>
   /** Candles shown on a market's chart. */
   candles: number
 }
 
-export const DEFAULT_SETTINGS: Settings = { refreshSeconds: 5, notifications: false, autoLockMinutes: 15, equitySamples: 12, candles: 200 }
+export const DEFAULT_SETTINGS: Settings = { refreshSeconds: 5, notifications: false, autoLockMinutes: 15, openPanels: {}, candles: 200 }
 
 export const useSettings = create<Settings & { load: () => Promise<void>; change: (patch: Partial<Settings>) => Promise<void> }>((set, get) => ({
   ...DEFAULT_SETTINGS,
@@ -23,7 +23,7 @@ export const useSettings = create<Settings & { load: () => Promise<void>; change
   },
   async change(patch) {
     set(patch)
-    const { refreshSeconds, notifications, autoLockMinutes, equitySamples, candles } = get()
-    await db.set('settings', { refreshSeconds, notifications, autoLockMinutes, equitySamples, candles })
+    const { refreshSeconds, notifications, autoLockMinutes, openPanels, candles } = get()
+    await db.set('settings', { refreshSeconds, notifications, autoLockMinutes, openPanels, candles })
   },
 }))
