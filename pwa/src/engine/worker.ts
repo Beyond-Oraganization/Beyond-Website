@@ -1,6 +1,7 @@
 /**
- * The Web Worker that runs the bot's backtest engine (its Core, compiled to WebAssembly), so a backtest never
- * blocks the page. The .NET runtime starts on the first message and stays up for the next ones.
+ * A Web Worker that runs the bot's backtest engine (its Core, compiled to WebAssembly), so a backtest never blocks
+ * the page. The .NET runtime starts on the first message and stays up for the next ones. A Monte Carlo runs in
+ * several of these at once, each with its share of the scenarios.
  */
 
 import type { CandleColumns } from './types.ts'
@@ -8,12 +9,18 @@ import type { CandleColumns } from './types.ts'
 export type WorkerCall =
   | { id: number; base: string; kind: 'version' }
   | { id: number; base: string; kind: 'backtest'; request: string; candles: CandleColumns }
+  | { id: number; base: string; kind: 'simulate'; request: string; candles: CandleColumns; first: number; count: number }
+  | { id: number; base: string; kind: 'summarize'; request: string }
 
 export type WorkerReply = { id: number; value: string } | { id: number; error: string }
 
+type Columns = [openTimes: number[], open: number[], high: number[], low: number[], close: number[], volume: number[]]
+
 type EngineExports = {
   Version: () => string
-  Backtest: (request: string, openTimes: number[], open: number[], high: number[], low: number[], close: number[], volume: number[]) => string
+  Backtest: (request: string, ...columns: Columns) => string
+  Simulate: (request: string, ...columnsThenRange: [...Columns, first: number, count: number]) => string
+  Summarize: (request: string) => string
 }
 
 type DotnetModule = {
@@ -36,19 +43,37 @@ async function start(base: string): Promise<EngineExports> {
   return exports.BeyondBot.Browser.Engine
 }
 
+/** .NET takes plain arrays of numbers; a typed array would not marshal as one. */
+const columns = ({ time, open, high, low, close, volume }: CandleColumns): Columns => [
+  Array.from(time),
+  Array.from(open),
+  Array.from(high),
+  Array.from(low),
+  Array.from(close),
+  Array.from(volume),
+]
+
+function answer(exports: EngineExports, call: WorkerCall): string {
+  switch (call.kind) {
+    case 'version':
+      return exports.Version()
+    case 'backtest':
+      return exports.Backtest(call.request, ...columns(call.candles))
+    case 'simulate':
+      return exports.Simulate(call.request, ...columns(call.candles), call.first, call.count)
+    case 'summarize':
+      return exports.Summarize(call.request)
+  }
+}
+
 // A listener, never `self.onmessage`: .NET's runtime takes over a worker's onmessage while it starts, and with one
 // assigned dotnet.create() never resolves (found with the app's end-to-end tests).
 scope.addEventListener('message', async ({ data }: MessageEvent<WorkerCall>) => {
-  const reply = (message: WorkerReply) => scope.postMessage(message)
   try {
     engine ??= start(data.base)
-    const exports = await engine
-    if (data.kind === 'version') return reply({ id: data.id, value: exports.Version() })
-    // .NET takes plain arrays of numbers; a typed array would not marshal as one.
-    const { time, open, high, low, close, volume } = data.candles
-    reply({ id: data.id, value: exports.Backtest(data.request, Array.from(time), Array.from(open), Array.from(high), Array.from(low), Array.from(close), Array.from(volume)) })
+    scope.postMessage({ id: data.id, value: answer(await engine, data) })
   } catch (error) {
     engine = null
-    reply({ id: data.id, error: error instanceof Error ? error.message : String(error) })
+    scope.postMessage({ id: data.id, error: error instanceof Error ? error.message : String(error) })
   }
 })

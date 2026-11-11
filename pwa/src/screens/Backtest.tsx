@@ -4,7 +4,8 @@ import { useBot, useRead } from '../api/bot.ts'
 import { CommandFailure } from '../api/client.ts'
 import { cmd } from '../api/commands.ts'
 import type { SessionSizing } from '../api/types.ts'
-import { curveByTime, forStorage, isDeviceRun, keep, kellyShare, type DeviceRun, type SavedRun } from '../backtest/runs.ts'
+import { curveByTime, endedAbove, isDeviceRun, keep, keepScenarios, kellyShare, METHOD_NAMES, type DeviceRun, type KeptScenarios, type SavedRun } from '../backtest/runs.ts'
+import { clearRuns, loadDetails, loadRuns, saveRun } from '../backtest/saved.ts'
 import { FailurePanel } from '../components/Answer.tsx'
 import { MonteCarloSection, ReportFigures } from '../components/backtest/Report.tsx'
 import { TradeReturnsChart } from '../components/backtest/TradeReturnsChart.tsx'
@@ -17,18 +18,28 @@ import { Button, Callout, EmptyState, Section, Skeleton } from '../components/ui
 import { readCopy, updateCopy, type CopyInfo } from '../data/candles.ts'
 import { useEngine, useEngineVersion } from '../engine/context.ts'
 import { EngineCancelled } from '../engine/engine.ts'
+import type { PathMethod } from '../engine/types.ts'
 import { fmtCount, fmtMoney, fmtPercent, fmtSignedMoney, fmtSignedPercent, fmtTime, tone } from '../format.ts'
 import { useMarkets, useStatus, useStrategies } from '../hooks/data.ts'
-import { db } from '../state/db.ts'
+import { keepsEverything } from '../storage/local-store.ts'
 import { applySetup, configFromInput, initialConfig, toInput, validateConfig, type StrategyConfig } from '../strategy/config.ts'
 
 const dateOrNull = (text: string) => (text ? Date.parse(`${text}T00:00:00Z`) : null)
 /** A UTC time as the engine reads it, without "Z". */
 const utc = (ms: number | null) => (ms == null ? null : new Date(ms).toISOString().slice(0, 19))
 
-type Phase = { step: 'candles'; market: string; info: CopyInfo | null } | { step: 'kelly' } | { step: 'engine'; paths: number }
+type Phase =
+  | { step: 'candles'; market: string; info: CopyInfo | null }
+  | { step: 'kelly' }
+  | { step: 'engine' }
+  | { step: 'scenarios'; done: number; total: number; method: PathMethod }
+  | { step: 'summary' }
 
-const PATHS = ['0', '500', '1000', '2000'] as const
+const SCENARIOS = ['0', '100', '200', '500', '1000'] as const
+const METHODS: { value: PathMethod; label: string }[] = [
+  { value: 'Bootstrap', label: 'Bootstrap (real moves)' },
+  { value: 'BrownianMotion', label: 'Brownian motion (random walk)' },
+]
 
 function phaseWords(phase: Phase): string {
   if (phase.step === 'candles')
@@ -36,8 +47,13 @@ function phaseWords(phase: Phase): string {
       ? `Copying ${phase.market} candles from the bot: ${fmtCount(phase.info.count)}, up to ${fmtTime(phase.info.newest)} UTC…`
       : `Bringing this device’s ${phase.market} candles up to date…`
   if (phase.step === 'kelly') return 'Asking the bot for the Kelly sizing it would trade with…'
-  return phase.paths ? `Backtesting on this device, then ${fmtCount(phase.paths)} Monte Carlo paths…` : 'Backtesting on this device…'
+  if (phase.step === 'engine') return 'Backtesting on this device…'
+  if (phase.step === 'scenarios') return `Backtesting alternative price histories by ${METHOD_NAMES[phase.method]}: ${fmtCount(phase.done)} of ${fmtCount(phase.total)} done…`
+  return 'Summing up the alternative histories…'
 }
+
+/** A seed for one Monte Carlo: every worker makes its scenarios from it. */
+const newSeed = () => Math.floor(Math.random() * 2 ** 31)
 
 /** "drcs on XAUUSD 1h". */
 const titleOf = (run: SavedRun) => (isDeviceRun(run) ? `${run.result.strategy} on ${run.result.market.symbol} ${run.result.market.interval}` : `${run.report.strategy} on ${run.report.market}`)
@@ -56,7 +72,8 @@ export default function Backtest() {
   const [balance, setBalance] = useState('1000')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
-  const [paths, setPaths] = useState<(typeof PATHS)[number]>('1000')
+  const [scenarios, setScenarios] = useState<(typeof SCENARIOS)[number]>('200')
+  const [method, setMethod] = useState<PathMethod>('Bootstrap')
   const [touched, setTouched] = useState(false)
   const [phase, setPhase] = useState<Phase | null>(null)
   const [failure, setFailure] = useState<CommandFailure | null>(null)
@@ -73,7 +90,7 @@ export default function Backtest() {
   const draft = edited ?? (definitions && rows ? initialConfig(definitions, rows, { symbol, interval, strategy: params.get('strategy') }) : null)
   const botVersion = status.data?.parsed.ok ? status.data.parsed.value.version : null
   useEffect(() => {
-    if (connection) void db.get<SavedRun[]>(`backtests:${connection.id}`).then((list) => setSaved(list ?? []))
+    if (connection) void loadRuns(connection.id).then(setSaved)
   }, [connection])
 
   const definition = definitions?.find((d) => d.name === draft?.strategy)
@@ -84,9 +101,12 @@ export default function Backtest() {
     return found
   }, [draft, definition, balance, from, to])
 
-  const persist = async (list: SavedRun[]) => {
-    setSaved(list)
-    if (connection) await db.set(`backtests:${connection.id}`, list.slice(-50))
+  /** Shows a saved run, with its Monte Carlo's paths when this device kept them. */
+  const show = async (run: SavedRun) => {
+    setCurrent(run)
+    if (!connection || !isDeviceRun(run) || !run.monteCarlo || run.monteCarlo.details) return
+    const details = await loadDetails(connection.id, run.id)
+    if (details) setCurrent({ ...run, monteCarlo: { ...run.monteCarlo, details } })
   }
 
   /** Brings this device's candles up to date, asks the bot for its Kelly when the sizing needs it, then backtests here. */
@@ -95,7 +115,7 @@ export default function Backtest() {
     if (!draft || !connection || Object.keys(errors).length) return
     const input = toInput(draft, definition)
     const market = `${input.symbol} ${input.interval}`
-    const asked = Number(paths)
+    const asked = Number(scenarios)
     const controller = new AbortController()
     stop.current = controller
     setFailure(null)
@@ -112,28 +132,40 @@ export default function Backtest() {
         kelly = ((await read(cmd.kelly(input, share), controller.signal)).json as SessionSizing | null)?.kelly ?? null
         if (!kelly) throw new Error('The bot’s Kelly sizing could not be read.')
       }
-      setPhase({ step: 'engine', paths: asked })
-      const answer = await engine().backtest(
-        {
-          strategy: input.strategy,
-          symbol: input.symbol,
-          interval: input.interval,
-          parameters: input.params,
-          rules: input.rules,
-          sizing: input.sizing,
-          kelly,
-          balance: Number(balance),
-          from: utc(dateOrNull(from)),
-          to: utc(dateOrNull(to)),
-          monteCarlo: asked ? { paths: asked } : null,
-        },
-        candles,
-        controller.signal,
-      )
+      setPhase({ step: 'engine' })
+      const request = {
+        strategy: input.strategy,
+        symbol: input.symbol,
+        interval: input.interval,
+        parameters: input.params,
+        rules: input.rules,
+        sizing: input.sizing,
+        kelly,
+        balance: Number(balance),
+        from: utc(dateOrNull(from)),
+        to: utc(dateOrNull(to)),
+      }
+      const answer = await engine().backtest(request, candles, controller.signal)
       if (!answer.ok) return setProblem(answer.error.message)
-      const run: DeviceRun = { kind: 'device', id: `${Date.now()}`, at: Date.now(), input, balance: Number(balance), from: dateOrNull(from), to: dateOrNull(to), paths: asked, result: keep(answer) }
+      let monteCarlo: KeptScenarios | null = null
+      if (asked) {
+        setPhase({ step: 'scenarios', done: 0, total: asked, method })
+        const simulated = await engine().simulate({ ...request, scenarios: { method, seed: newSeed() } }, candles, asked, {
+          signal: controller.signal,
+          onProgress: (done, total) => setPhase({ step: 'scenarios', done, total, method }),
+        })
+        if (!simulated.ok) return setProblem(simulated.error.message)
+        setPhase({ step: 'summary' })
+        const summed = await engine().summarize({ initialBalance: Number(balance), real: answer.realScenario, results: simulated.results }, controller.signal)
+        if (!summed.ok) return setProblem(summed.error.message)
+        monteCarlo = keepScenarios(answer, simulated, summed.summary)
+      }
+      const run: DeviceRun = {
+        kind: 'device', id: `${Date.now()}`, at: Date.now(), input, balance: Number(balance), from: dateOrNull(from), to: dateOrNull(to),
+        scenarios: asked, method, result: keep(answer), monteCarlo,
+      }
       setCurrent(run)
-      await persist([...saved, forStorage(run)])
+      setSaved(await saveRun(connection.id, run, { keepEverything: keepsEverything() }))
     } catch (error) {
       if (error instanceof EngineCancelled || (error instanceof CommandFailure && error.kind === 'cancelled')) return
       if (error instanceof CommandFailure && error.kind === 'usage')
@@ -155,7 +187,7 @@ export default function Backtest() {
       <ScreenHead
         kicker="Backtest"
         title="Replay a strategy."
-        lead="This device replays the strategy over its own copy of the bot’s candles, with the bot’s own code, then draws a thousand more paths from the trades. The bot only hands out the candles, and its Kelly sizing when you size by Kelly."
+        lead="This device replays the strategy over its own copy of the bot’s candles, with the bot’s own code, then backtests it again on alternative price histories of the same dates. The bot only hands out the candles, and its Kelly sizing when you size by Kelly."
       />
       <Section variant="alt" label="Backtest settings">
         {!definitions || !rows || !draft ? (
@@ -194,11 +226,21 @@ export default function Backtest() {
             <Segmented
               name="monte-carlo"
               legend="Monte Carlo"
-              value={paths}
-              onChange={setPaths}
-              options={PATHS.map((value) => ({ value, label: value === '0' ? 'Off' : `${fmtCount(Number(value))} paths` }))}
-              hint="Paths drawn at random from the backtest’s own trades, each as long as the backtest. A thousand is the usual minimum for steady percentiles."
+              value={scenarios}
+              onChange={setScenarios}
+              options={SCENARIOS.map((value) => ({ value, label: value === '0' ? 'Off' : `${fmtCount(Number(value))} scenarios` }))}
+              hint="How many alternative price histories of the same dates to backtest the strategy on, each made up at random. 200 take seconds on a computer, longer on a phone."
             />
+            {scenarios !== '0' ? (
+              <Segmented
+                name="price-paths"
+                legend="Alternative histories by"
+                value={method}
+                onChange={setMethod}
+                options={METHODS}
+                hint="The bootstrap glues real candle moves in random blocks, so real tails and calm or wild spells stay. Brownian motion is a calm random walk with the real drift and volatility: a baseline."
+              />
+            ) : null}
             {engineVersion && botVersion && engineVersion !== botVersion ? (
               <Callout label="Versions" tone="warn">
                 <p>
@@ -273,19 +315,32 @@ export default function Backtest() {
           </div>
         </Section>
       ) : null}
-      {device && (device.result.monteCarlo || device.result.monteCarloSkipped) ? (
+      {device?.monteCarlo || device?.result.monteCarlo ? (
         <Section variant="alt" label="Monte Carlo">
           <div className="section-title">
             <h2 className="h2">Monte Carlo</h2>
           </div>
-          <MonteCarloSection result={device.result} />
+          {device.monteCarlo ? (
+            <MonteCarloSection mc={device.monteCarlo} />
+          ) : (
+            <p className="p">
+              This run was saved with the Monte Carlo used before, which resampled its trades: {fmtPercent(device.result.monteCarlo!.endedAboveStartPercent, 1)} of{' '}
+              {fmtCount(device.result.monteCarlo!.paths)} paths ended above the start. Run it again to backtest it on alternative price histories.
+            </p>
+          )}
         </Section>
       ) : null}
-      <Section variant={device && (device.result.monteCarlo || device.result.monteCarloSkipped) ? 'default' : 'alt'} label="Saved runs">
+      <Section variant={device?.monteCarlo || device?.result.monteCarlo ? 'default' : 'alt'} label="Saved runs">
         <div className="section-title">
           <h2 className="h2">Saved runs</h2>
           {saved.length ? (
-            <button type="button" className="link small" onClick={() => void persist([])}>
+            <button
+              type="button"
+              className="link small"
+              onClick={() => {
+                if (connection) void clearRuns(connection.id).then(() => setSaved([]))
+              }}
+            >
               Clear
             </button>
           ) : null}
@@ -320,13 +375,16 @@ export default function Backtest() {
                   key: 'mc',
                   header: 'Ended above start',
                   align: 'right',
-                  render: (run) => (isDeviceRun(run) && run.result.monteCarlo ? fmtPercent(run.result.monteCarlo.endedAboveStartPercent, 1) : '–'),
+                  render: (run) => {
+                    const above = endedAbove(run)
+                    return above ? `${fmtPercent(above.percent, 1)} · ${above.method}` : '–'
+                  },
                 },
                 { key: 'when', header: 'Run', render: (run) => fmtTime(run.at) },
               ]}
               actions={(run) => (
                 <span className="row">
-                  <Button compact variant="ghost" onClick={() => setCurrent(run)}>
+                  <Button compact variant="ghost" onClick={() => void show(run)}>
                     Show
                   </Button>
                   <Button
@@ -370,7 +428,11 @@ export default function Backtest() {
             ) : null}
           </div>
         ) : (
-          <EmptyState title="No runs yet.">Each backtest you run is kept on this device (the last 50), with its Monte Carlo’s results.</EmptyState>
+          <EmptyState title="No runs yet.">
+            {keepsEverything()
+              ? 'Each backtest you run is kept in this app’s database, with every scenario of its Monte Carlo.'
+              : 'Each backtest you run is kept on this device (the last 50), with its Monte Carlo’s results.'}
+          </EmptyState>
         )}
       </Section>
     </>
@@ -392,5 +454,12 @@ const COMPARED_ROWS: CompareRow[] = [
     'Max drawdown',
     (run) => (isDeviceRun(run) ? `${fmtSignedMoney(run.result.maxDrawdown)} (${fmtPercent(run.result.maxDrawdownPercent)})` : `${fmtSignedMoney(run.report.maxDrawdown)} (${fmtPercent(run.report.maxDrawdownPercent)})`),
   ],
-  ['Ended above start', (run) => (isDeviceRun(run) && run.result.monteCarlo ? `${fmtPercent(run.result.monteCarlo.endedAboveStartPercent, 1)} of ${fmtCount(run.result.monteCarlo.paths)} paths` : '–')],
+  [
+    'Monte Carlo',
+    (run) => {
+      const above = endedAbove(run)
+      return above ? `${fmtPercent(above.percent, 1)} of ${fmtCount(above.of)} ended above the start (${above.method})` : '–'
+    },
+  ],
+  ['Real history beat', (run) => (isDeviceRun(run) && run.monteCarlo ? `${fmtPercent(run.monteCarlo.summary.realBeatPercent, 0)} of the alternative pasts` : '–')],
 ]

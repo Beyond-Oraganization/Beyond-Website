@@ -161,7 +161,7 @@ describe('answers from the mock bot', () => {
 
   it('status, market list and sync', async () => {
     const status = parseStatus(await run('status'))
-    expect(status.ok && status.value).toMatchObject({ version: '2.1.0', user: 'demo', database: { connected: true, schema: 2 }, broker: { state: 'connected', mode: 'DEMO' }, trading: 1 })
+    expect(status.ok && status.value).toMatchObject({ version: '2.2.0', user: 'demo', database: { connected: true, schema: 2 }, broker: { state: 'connected', mode: 'DEMO' }, trading: 1 })
     const markets = parseMarketList(await run('market', 'list'))
     expect(markets.ok && markets.value.map((m) => `${m.symbol} ${m.interval}`)).toEqual(['EURUSD 4h', 'XAUUSD 1h'])
     const sync = parseMarketSync(await run('market', 'sync'))

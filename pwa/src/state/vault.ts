@@ -1,4 +1,4 @@
-import { db } from './db.ts'
+import { browserStore } from '../storage/local-store.ts'
 
 /**
  * The API key at rest. It controls everything (orders, logins, credentials), and every GitHub Pages site of the
@@ -52,12 +52,18 @@ async function fromPassphrase(passphrase: string, salt: Uint8Array<ArrayBuffer>,
   return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
 }
 
+let kept: CryptoKey | null = null
+
+/**
+ * The device key, in the browser's own IndexedDB even inside the desktop app: it is non-extractable, so it can never
+ * cross the desktop app's bridge into its SQLite file. If storing fails it stays in memory for this visit.
+ */
 async function deviceKey(): Promise<CryptoKey> {
-  const existing = await db.get<CryptoKey>('device-key')
-  if (existing) return existing
-  const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
-  await db.set('device-key', key)
-  return key
+  kept ??= (await browserStore('app').get<CryptoKey>('device-key').catch(() => undefined)) ?? null
+  if (kept) return kept
+  kept = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
+  await browserStore('app').set('device-key', kept).catch(() => undefined)
+  return kept
 }
 
 export async function seal(id: string, secret: string, passphrase: string | null): Promise<Sealed> {

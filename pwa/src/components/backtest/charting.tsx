@@ -76,3 +76,28 @@ export function ChartTip({ at, width, children }: { at: { x: number; y: number }
     </div>
   )
 }
+
+const DAY = 86_400_000
+
+/** A date on a time axis, as precise as the gap between ticks needs: the year, the month, or the day. */
+export function dateLabel(ms: number, gap: number): string {
+  const iso = new Date(ms).toISOString()
+  return gap > 300 * DAY ? iso.slice(0, 4) : gap > 25 * DAY ? iso.slice(0, 7) : iso.slice(0, 10)
+}
+
+/**
+ * The labels of a time axis over evenly spaced `times`: about `count` of them, always the first and the last, each
+ * as precise as the gap between them needs, and none twice.
+ */
+export function timeTicks(times: number[], count: number): { index: number; label: string }[] {
+  if (times.length < 2) return times.length ? [{ index: 0, label: dateLabel(times[0]!, 0) }] : []
+  const steps = Math.max(1, Math.min(count, times.length - 1))
+  const gap = (times.at(-1)! - times[0]!) / steps
+  const ticks: { index: number; label: string }[] = []
+  for (let i = 0; i <= steps; i++) {
+    const index = Math.round((i * (times.length - 1)) / steps)
+    const label = dateLabel(times[index]!, gap)
+    if (ticks.at(-1)?.label !== label) ticks.push({ index, label })
+  }
+  return ticks
+}

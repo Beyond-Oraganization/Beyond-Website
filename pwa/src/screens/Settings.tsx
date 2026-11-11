@@ -9,6 +9,7 @@ import { InstallHelp } from '../install/InstallHelp.tsx'
 import { useInstall } from '../install/install.ts'
 import { deleteCopy, listCopies, type CopyInfo } from '../data/candles.ts'
 import { fmtBytes, fmtCount, fmtRelative, fmtTime } from '../format.ts'
+import { clearRuns } from '../backtest/saved.ts'
 import { db } from '../state/db.ts'
 import { useLogs } from '../state/logs.ts'
 import { useSettings } from '../state/settings.ts'
@@ -147,7 +148,7 @@ export default function Settings() {
               disabled={!connection}
               onClick={async () => {
                 if (!connection) return
-                await db.del(`backtests:${connection.id}`)
+                await clearRuns(connection.id)
                 toast.info('Cleared', 'Saved backtests are gone from this device.')
               }}
             >

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { deviceAnswer } from './fixtures.ts'
+import { deviceAnswer, scenariosAnswer, summaryAnswer } from './fixtures.ts'
 import { figuresOf } from './figures.ts'
-import { curveByTime, forStorage, keep, kellyShare, pathByTrade, type DeviceRun } from './runs.ts'
+import { curveByTime, endedAbove, keep, keepScenarios, kellyShare, type DeviceRun } from './runs.ts'
 
 const run = (answer = deviceAnswer()): DeviceRun => ({
-  kind: 'device', id: '1', at: 0, input: { strategy: 'drcs', symbol: 'XAUUSD', interval: '1h', params: {} }, balance: 1000, from: null, to: null, paths: 3, result: keep(answer),
+  kind: 'device', id: '1', at: 0, input: { strategy: 'drcs', symbol: 'XAUUSD', interval: '1h', params: {} }, balance: 1000, from: null, to: null, scenarios: 3, method: 'Bootstrap', result: keep(answer),
 })
 
 describe('a device backtest as the page keeps it', () => {
@@ -14,22 +14,29 @@ describe('a device backtest as the page keeps it', () => {
     expect(kept.tradeReturns).toEqual([0.02, -0.01])
     expect(kept.overlappingTrades).toBe(1)
     expect(kept.curve[0]).toEqual([Date.parse('2025-01-06T05:00:00Z'), 1010])
-    expect(kept.monteCarlo?.finals).toEqual([1020.1, 1004.95, 994.98])
   })
 
-  it('is saved without the Monte Carlo’s paths, keeping their final balances', () => {
-    const saved = forStorage(run())
+  it('keeps a Monte Carlo’s summary, each scenario’s final balance, and the real history’s path and prices beside its details', () => {
+    const kept = keepScenarios(deviceAnswer(), scenariosAnswer(), summaryAnswer().summary)
 
-    expect(saved.result.monteCarlo?.pathPoints).toBeNull()
-    expect(saved.result.monteCarlo?.finals).toHaveLength(3)
+    expect(kept.finals).toEqual([1020.1, 1004.9, 994.98])
+    expect([kept.times.length, kept.real.length, kept.real.at(-1)]).toEqual([51, 51, 1004.95])
+    expect([kept.priceTimes.length, kept.realPrices]).toEqual([3, [2000, 2010, 2005]])
+    expect(kept.details?.paths).toHaveLength(3)
+    expect(kept.details?.prices[0]).toEqual([2000, 2020, 2030])
+  })
+
+  it('says how many scenarios ended above the start, and by which method, for runs from before 2.2.0 too', () => {
+    const now = { ...run(), monteCarlo: keepScenarios(deviceAnswer(), scenariosAnswer(), summaryAnswer().summary) }
+    const before = { ...run(), result: { ...keep(deviceAnswer()), monteCarlo: { paths: 1000, endedAboveStartPercent: 61.2 } } }
+
+    expect(endedAbove(now)).toEqual({ percent: 66.66666666666667, of: 3, method: 'bootstrap' })
+    expect(endedAbove(before)).toEqual({ percent: 61.2, of: 1000, method: 'trade resampling' })
+    expect(endedAbove(run())).toBeNull()
   })
 
   it('draws one point per time, the last balance when two trades closed on the same candle', () => {
     expect(curveByTime(keep(deviceAnswer()).curve)).toEqual([{ time: Date.parse('2025-01-06T05:00:00Z'), value: 1004.95 }])
-  })
-
-  it('walks its own path by trade number, from the starting balance', () => {
-    expect(pathByTrade(keep(deviceAnswer()))).toEqual([1000, 1010, 1004.95])
   })
 
   it('reads how much of Kelly a sizing asks for', () => {

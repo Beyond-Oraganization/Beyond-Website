@@ -22,7 +22,7 @@ const WEEKEND = new Set(['XAUUSD', 'XAGUSD', 'XAUTUSDT', 'XAGUSDT', 'EURPLN', 'E
 const isWeekend = (ms) => [0, 6].includes(new Date(ms).getUTCDay())
 const HISTORY_START = Date.UTC(2019, 0, 1)
 /** The bot version this mock answers as (Directory.Build.props): the app compares it with its engine's. */
-const VERSION = '2.1.0'
+const VERSION = '2.2.0'
 const HELP_HINT = 'Run the command with --help to see its arguments and options.'
 const BROKER_HINT = "Check the connection with 'status'; the log has the details."
 const SYMBOLS = {
