@@ -1,16 +1,16 @@
-import { createStore, del, get, keys, set, type UseStore } from 'idb-keyval'
 import { cmd } from '../api/commands.ts'
 import type { CommandResult } from '../api/types.ts'
 import type { CandleColumns } from '../engine/types.ts'
+import { localStore } from '../storage/local-store.ts'
 
 /**
  * This device's own copy of a market's candles, for backtests on the device. The first time it downloads the
  * market's whole history from the bot (`candles export`, page by page); after that it asks only from its newest
  * candle on. It is a cache: the candles live on the bot, so clearing it costs one download.
  *
- * Kept in IndexedDB database "beyond-bot-candles", per bot connection and market, as number columns in chunks of
- * 5,000 candles, so an update rewrites only the last chunk. Without IndexedDB (tests, some private modes) it stays in
- * memory for this visit.
+ * Kept in `localStore('candles')` (IndexedDB database "beyond-bot-candles" in a browser, the SQLite file in the
+ * desktop app), per bot connection and market, as number columns in chunks of 5,000 candles, so an update rewrites
+ * only the last chunk.
  */
 
 /** Candles per stored chunk, and per page asked of the bot. */
@@ -39,27 +39,7 @@ type StoredChunk = CandleColumns
 const COLUMNS = ['time', 'open', 'high', 'low', 'close', 'volume'] as const
 const BYTES_PER_CANDLE = COLUMNS.length * 8
 
-let store: UseStore | null = null
-const memory = new Map<string, unknown>()
-const hasIdb = () => typeof indexedDB !== 'undefined'
-const idb = () => (store ??= createStore('beyond-bot-candles', 'chunks'))
-
-const storage = {
-  async get<T>(key: string): Promise<T | undefined> {
-    return hasIdb() ? get<T>(key, idb()) : (memory.get(key) as T | undefined)
-  },
-  async set(key: string, value: unknown) {
-    if (hasIdb()) await set(key, value, idb())
-    else memory.set(key, value)
-  },
-  async del(key: string) {
-    if (hasIdb()) await del(key, idb())
-    else memory.delete(key)
-  },
-  async keys(): Promise<string[]> {
-    return hasIdb() ? ((await keys(idb())) as string[]) : [...memory.keys()]
-  },
-}
+const storage = () => localStore('candles')
 
 const metaKey = (connectionId: string, market: string) => `${connectionId}|${market}|meta`
 const chunkKey = (connectionId: string, market: string, index: number) => `${connectionId}|${market}|${index}`
@@ -112,14 +92,14 @@ export async function updateCopy(
   { onProgress, signal }: { onProgress?: (info: CopyInfo) => void; signal?: AbortSignal } = {},
 ): Promise<CopyInfo> {
   const [symbol = '', interval = ''] = market.split(' ')
-  let info = (await storage.get<CopyInfo>(metaKey(connectionId, market))) ?? null
+  let info = (await storage().get<CopyInfo>(metaKey(connectionId, market))) ?? null
   let startedOver = false
 
   for (;;) {
     let index = info ? info.chunks - 1 : 0
     let current = emptyColumns()
     if (info) {
-      const last = await storage.get<StoredChunk>(chunkKey(connectionId, market, index))
+      const last = await storage().get<StoredChunk>(chunkKey(connectionId, market, index))
       current = last ? fromStored(last, rowsInLast(info)) : emptyColumns()
     }
     let from = info ? info.newest : null
@@ -137,7 +117,7 @@ export async function updateCopy(
       }
       for (const row of rows) {
         if (current.time.length === CHUNK) {
-          await storage.set(chunkKey(connectionId, market, index), toStored(current))
+          await storage().set(chunkKey(connectionId, market, index), toStored(current))
           index++
           current = emptyColumns()
         }
@@ -145,7 +125,7 @@ export async function updateCopy(
         count++
       }
       if (count === 0) throw new Error(`The bot has no ${market} candles.`)
-      await storage.set(chunkKey(connectionId, market, index), toStored(current))
+      await storage().set(chunkKey(connectionId, market, index), toStored(current))
       info = {
         market,
         first: page.first,
@@ -155,7 +135,7 @@ export async function updateCopy(
         bytes: count * BYTES_PER_CANDLE,
         updatedAt: Date.now(),
       }
-      await storage.set(metaKey(connectionId, market), info)
+      await storage().set(metaKey(connectionId, market), info)
       onProgress?.(info)
       if (page.next == null) return info
       from = page.next
@@ -171,12 +151,12 @@ export async function updateCopy(
 
 /** The stored copy as one set of columns for the engine, or null when there is none. */
 export async function readCopy(connectionId: string, market: string): Promise<CandleColumns | null> {
-  const info = await storage.get<CopyInfo>(metaKey(connectionId, market))
+  const info = await storage().get<CopyInfo>(metaKey(connectionId, market))
   if (!info) return null
   const columns = {} as CandleColumns
   for (const column of COLUMNS) columns[column] = new Float64Array(info.count)
   for (let index = 0; index < info.chunks; index++) {
-    const chunk = await storage.get<StoredChunk>(chunkKey(connectionId, market, index))
+    const chunk = await storage().get<StoredChunk>(chunkKey(connectionId, market, index))
     if (!chunk) return null
     const rows = index === info.chunks - 1 ? rowsInLast(info) : CHUNK
     for (const column of COLUMNS) columns[column].set(chunk[column].subarray(0, rows), index * CHUNK)
@@ -187,9 +167,9 @@ export async function readCopy(connectionId: string, market: string): Promise<Ca
 /** Every market this device keeps a copy of for the bot, newest update first. */
 export async function listCopies(connectionId: string): Promise<CopyInfo[]> {
   const infos: CopyInfo[] = []
-  for (const key of await storage.keys()) {
-    if (key.startsWith(`${connectionId}|`) && key.endsWith('|meta')) {
-      const info = await storage.get<CopyInfo>(key)
+  for (const key of await storage().keys(`${connectionId}|`)) {
+    if (key.endsWith('|meta')) {
+      const info = await storage().get<CopyInfo>(key)
       if (info) infos.push(info)
     }
   }
@@ -197,5 +177,5 @@ export async function listCopies(connectionId: string): Promise<CopyInfo[]> {
 }
 
 export async function deleteCopy(connectionId: string, market: string): Promise<void> {
-  for (const key of await storage.keys()) if (key.startsWith(`${connectionId}|${market}|`)) await storage.del(key)
+  for (const key of await storage().keys(`${connectionId}|${market}|`)) await storage().delete(key)
 }

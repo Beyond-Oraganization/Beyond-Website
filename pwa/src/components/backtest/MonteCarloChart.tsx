@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type PointerEvent } from 'react'
 import { extent, niceTicks, valueBins, type ValueBin } from '../../backtest/bins.ts'
-import { fmtCount, fmtMoney } from '../../format.ts'
-import { barPath, ChartTip, LossHatch, useChartColors, useWidth } from './charting.tsx'
+import { fmtCount, fmtMoney, fmtTime } from '../../format.ts'
+import { barPath, ChartTip, LossHatch, timeTicks, useChartColors, useWidth } from './charting.tsx'
 
 const M = { top: 14, bottom: 30, left: 58 }
 const GAP = 14
@@ -9,23 +9,23 @@ const compact = (value: number) => (Math.abs(value) >= 10_000 ? `${(value / 1000
 
 export type MonteCarloChartProps = {
   start: number
-  /** Trade numbers (0 is the start) at which the paths are kept. */
-  pointTrades: number[]
+  /** The evenly spaced times (ms) at which every balance path is kept. */
+  times: number[]
   meanPath: number[]
-  /** Every path at the point trades; null for a saved run, which keeps only the final balances. */
-  pathPoints: number[][] | null
+  /** Every scenario's balance at the times; null when this device did not keep them. */
+  paths: number[][] | null
   finals: number[]
   meanFinal: number
-  /** The backtest's own balance by trade number, from the start. */
-  backtest: number[]
+  /** The real history's balance at the same times. */
+  real: number[]
 }
 
 /**
- * Every simulated balance path, faint, with the average path in bold and the backtest's own dashed; on the right, on
- * the same scale, how the paths ended (above the start in the gain colour, below it hatched) with a dot at the mean.
- * The paths are drawn on a canvas (a thousand SVG lines are slow on a phone); the rest is SVG.
+ * Every alternative history's balance over time, faint, with the average in bold and the real history's dashed; on
+ * the right, on the same scale, where the scenarios ended (above the start in the gain colour, below it hatched) with
+ * a dot at the mean. The paths are drawn on a canvas (a thousand SVG lines are slow on a phone); the rest is SVG.
  */
-export function MonteCarloChart({ start, pointTrades, meanPath, pathPoints, finals, meanFinal, backtest }: MonteCarloChartProps) {
+export function MonteCarloChart({ start, times, meanPath, paths, finals, meanFinal, real }: MonteCarloChartProps) {
   const box = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const width = useWidth(box)
@@ -37,9 +37,9 @@ export function MonteCarloChart({ start, pointTrades, meanPath, pathPoints, fina
   const side = Math.round(Math.min(170, Math.max(90, width * 0.2)))
   const plotW = width - M.left - GAP - side
   const plotH = height - M.top - M.bottom
-  const trades = pointTrades.at(-1) ?? 0
-  const [lo, hi] = useMemo(() => extent([finals, meanPath, backtest, [start], ...(pathPoints ?? [])]), [finals, meanPath, backtest, start, pathPoints])
-  const x = (trade: number) => M.left + (trades ? (trade / trades) * plotW : 0)
+  const last = Math.max(1, times.length - 1)
+  const [lo, hi] = useMemo(() => extent([finals, meanPath, real, [start], ...(paths ?? [])]), [finals, meanPath, real, start, paths])
+  const x = (point: number) => M.left + (point / last) * plotW
   const y = (balance: number) => M.top + plotH - ((balance - lo) / (hi - lo)) * plotH
   const bins = useMemo(() => valueBins(finals, lo, hi, Math.max(12, Math.min(40, Math.round(plotH / 9)))), [finals, lo, hi, plotH])
   const most = Math.max(1, ...bins.map((bin) => bin.count))
@@ -56,42 +56,40 @@ export function MonteCarloChart({ start, pointTrades, meanPath, pathPoints, fina
     element.height = Math.round(height * ratio)
     context.setTransform(ratio, 0, 0, ratio, 0, 0)
     context.clearRect(0, 0, width, height)
-    if (!pathPoints?.length) return
+    if (!paths?.length) return
     // Fainter the more paths there are, so where many cross still reads darker than where few do.
-    context.globalAlpha = Math.min(0.35, Math.max(0.035, 1.5 / Math.sqrt(pathPoints.length)))
+    context.globalAlpha = Math.min(0.35, Math.max(0.035, 1.5 / Math.sqrt(paths.length)))
     context.strokeStyle = colors.fg
     context.lineWidth = 1
     context.lineJoin = 'round'
-    for (const path of pathPoints) {
+    for (const path of paths) {
       context.beginPath()
-      path.forEach((balance, point) => (point ? context.lineTo(x(pointTrades[point]!), y(balance)) : context.moveTo(x(pointTrades[point]!), y(balance))))
+      path.forEach((balance, point) => (point ? context.lineTo(x(point), y(balance)) : context.moveTo(x(point), y(balance))))
       context.stroke()
     }
     // x and y read only the layout values in this effect's dependencies.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathPoints, pointTrades, width, height, lo, hi, colors.fg])
+  }, [paths, last, width, height, lo, hi, colors.fg])
 
-  const line = (values: number[], at: (index: number) => number) => values.map((value, index) => `${index ? 'L' : 'M'}${at(index).toFixed(1)},${y(value).toFixed(1)}`).join('')
-  const meanLine = line(meanPath, (index) => x(pointTrades[index]!))
-  const ownLine = line(backtest, (index) => x(index))
+  const line = (values: number[]) => values.map((value, point) => `${point ? 'L' : 'M'}${x(point).toFixed(1)},${y(value).toFixed(1)}`).join('')
+  const meanLine = line(meanPath)
+  const realLine = line(real)
   const yTicks = niceTicks(lo, hi, Math.max(3, Math.round(plotH / 60)))
-  const xTicks = niceTicks(0, trades, Math.max(2, Math.floor(plotW / 90))).filter((tick) => Number.isInteger(tick))
+  const xTicks = timeTicks(times, Math.max(2, Math.floor(plotW / 110)))
 
   const onMove = (event: PointerEvent<SVGRectElement>) => {
     const { offsetX, offsetY } = event.nativeEvent
     if (offsetX <= M.left + plotW) {
-      const trade = Math.max(0, Math.min(trades, ((offsetX - M.left) / plotW) * trades))
-      const point = pointTrades.reduce((best, candidate, index) => (Math.abs(candidate - trade) < Math.abs(pointTrades[best]! - trade) ? index : best), 0)
-      const at = pointTrades[point]!
-      setHover({ x: x(at), y: offsetY, text: [`Trade ${fmtCount(at)} of ${fmtCount(trades)}`, `Average ${fmtMoney(meanPath[point])}${backtest[at] != null ? ` · this backtest ${fmtMoney(backtest[at])}` : ''}`] })
+      const point = Math.round(Math.max(0, Math.min(1, (offsetX - M.left) / plotW)) * last)
+      setHover({ x: x(point), y: offsetY, text: [`${fmtTime(times[point])} UTC`, `Average ${fmtMoney(meanPath[point])} · real history ${fmtMoney(real[point])}`] })
     } else {
       const bin = bins.find((candidate) => y(candidate.from) >= offsetY && y(candidate.to) <= offsetY)
-      setHover(bin ? { x: offsetX - 220, y: offsetY, text: [`${fmtMoney(bin.from)} to ${fmtMoney(bin.to)}`, `${fmtCount(bin.count)} paths (${((bin.count / finals.length) * 100).toFixed(1)}%)`] } : null)
+      setHover(bin ? { x: offsetX - 220, y: offsetY, text: [`${fmtMoney(bin.from)} to ${fmtMoney(bin.to)}`, `${fmtCount(bin.count)} scenarios (${((bin.count / finals.length) * 100).toFixed(1)}%)`] } : null)
     }
   }
 
   const label =
-    `${fmtCount(finals.length)} simulated balance paths of ${fmtCount(trades)} trades from ${fmtMoney(start)}: ` +
+    `The balance over time in ${fmtCount(finals.length)} alternative price histories, from ${fmtMoney(start)}: ` +
     `${fmtCount(above)} ended above the start; they ended from ${fmtMoney(Math.min(...finals))} to ${fmtMoney(Math.max(...finals))}, ${fmtMoney(meanFinal)} on average.`
 
   return (
@@ -108,19 +106,16 @@ export function MonteCarloChart({ start, pointTrades, meanPath, pathPoints, fina
               </text>
             </g>
           ))}
-          {xTicks.map((tick) => (
-            <text key={tick} x={x(tick)} y={height - 8} className="tick" textAnchor="middle">
-              {fmtCount(tick)}
+          {xTicks.map((tick, index) => (
+            <text key={tick.index} x={x(tick.index)} y={height - 8} className="tick" textAnchor={index === 0 ? 'start' : index === xTicks.length - 1 ? 'end' : 'middle'}>
+              {tick.label}
             </text>
           ))}
-          <text x={M.left + plotW} y={height - 8} className="tick" textAnchor="end" dy="-14">
-            trade
-          </text>
           <line x1={M.left} x2={sideX + side} y1={y(start)} y2={y(start)} className="start" />
           <text x={M.left + 6} y={y(start) - 6} className="tick strong">
             start {fmtMoney(start)}
           </text>
-          {backtest.length > 1 ? <path d={ownLine} className="own" /> : null}
+          {real.length > 1 ? <path d={realLine} className="own" /> : null}
           <path d={meanLine} className="mean-halo" />
           <path d={meanLine} className="mean" />
           <line x1={sideX} x2={sideX} y1={M.top} y2={M.top + plotH} className="axis" />
@@ -133,7 +128,7 @@ export function MonteCarloChart({ start, pointTrades, meanPath, pathPoints, fina
               />
             ) : null,
           )}
-          <line x1={x(trades)} x2={sideX} y1={y(meanPath.at(-1) ?? meanFinal)} y2={y(meanFinal)} className="connector" />
+          <line x1={x(last)} x2={sideX} y1={y(meanPath.at(-1) ?? meanFinal)} y2={y(meanFinal)} className="connector" />
           <circle cx={sideX} cy={y(meanFinal)} r={6} className="mean-dot" />
           <text x={sideX + 10} y={y(meanFinal) - 10} className="tick strong">
             mean {compact(meanFinal)}
@@ -154,16 +149,16 @@ export function MonteCarloChart({ start, pointTrades, meanPath, pathPoints, fina
         </ChartTip>
       </div>
       <p className="chart-legend">
-        {pathPoints ? (
+        {paths ? (
           <span>
-            <i className="thin" /> One simulated path
+            <i className="thin" /> One alternative history
           </span>
         ) : null}
         <span>
-          <i className="thick" /> Average path
+          <i className="thick" /> Average
         </span>
         <span>
-          <i className="dash" /> This backtest
+          <i className="dash" /> The real history
         </span>
         <span>
           <i className="sq gain" /> Ended above the start

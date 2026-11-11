@@ -27,8 +27,12 @@ export type EngineRequest = {
   from?: Iso | null
   /** UTC; the last candle's close when left out. */
   to?: Iso | null
-  monteCarlo?: { paths: number; seed?: number } | null
+  /** For `simulate`: how the alternative price histories are made. Every worker of one run gets the same seed. */
+  scenarios?: { method: PathMethod; seed: number } | null
 }
+
+/** How a Monte Carlo makes its alternative price histories (the bot's Core/Backtesting/PricePaths.cs). */
+export type PathMethod = 'Bootstrap' | 'BrownianMotion'
 
 export type EquityPoint = { time: Iso; balance: number }
 
@@ -46,32 +50,66 @@ export type DeviceTrade = {
   overlapped: boolean
 }
 
-/** At `percentile` %, each column sorted on its own (a row is not one path); drawdowns are zero or negative. */
-export type MonteCarloPercentile = { percentile: number; finalBalance: number; returnPercent: number; maxDrawdownPercent: number }
+/**
+ * One scenario's backtest (the real history's is scenario -1): its figures and its balance at 51 evenly spaced times
+ * from the window's start to its end, the last being the final balance.
+ */
+export type ScenarioResult = {
+  scenario: number
+  finalBalance: number
+  returnPercent: number
+  /** Zero or negative. */
+  maxDrawdownPercent: number
+  trades: number
+  winRate: number
+  points: number[]
+}
 
-export type MonteCarloResult = {
-  paths: number
-  tradesPerPath: number
+/** The closes of one scenario's path at the real answer's `priceTimes`. */
+export type ScenarioPrices = { scenario: number; closes: number[] }
+
+/** What one `simulate` call backtested: its share of the scenario numbers. */
+export type DeviceScenarios = {
+  ok: true
+  engine: string
+  method: PathMethod
   seed: number
+  /** The bootstrap's mean block length, in candles; null for Brownian motion. */
+  meanBlockLength: number | null
+  /** Brownian motion's mean log return per candle; null for the bootstrap. */
+  drift: number | null
+  /** Brownian motion's spread of the log returns per candle; null for the bootstrap. */
+  volatility: number | null
+  results: ScenarioResult[]
+  /** Scenarios 0 to 19 only, for the price-paths chart. */
+  prices: ScenarioPrices[]
+  computedMs: number
+}
+
+/** At `percentile` %, each column sorted on its own (a row is not one scenario); drawdowns are zero or negative. */
+export type ScenarioPercentile = { percentile: number; finalBalance: number; returnPercent: number; maxDrawdownPercent: number }
+
+export type ScenarioSummary = {
+  scenarios: number
   initialBalance: number
   endedAboveStart: number
   endedAboveStartPercent: number
-  ruined: number
   meanFinal: number
   medianFinal: number
-  percentiles: MonteCarloPercentile[]
-  overlappingTrades: number
-  warnings: string[]
-  /** Trade numbers (0 is the start) at which the mean path and every path are kept: at most 51. */
-  pointTrades: number[]
+  percentiles: ScenarioPercentile[]
+  /** The share of scenarios whose final balance is below the real history's. */
+  realBeatPercent: number
+  /** The average balance over the scenarios at each of the 51 times. */
   meanPath: number[]
-  /** Every path's balance at each point trade; its last point is its final balance. */
-  pathPoints: number[][]
 }
+
+export type SummaryRequest = { initialBalance: number; real: ScenarioResult; results: ScenarioResult[] }
+
+export type DeviceSummary = { ok: true; engine: string; summary: ScenarioSummary }
 
 export type DeviceBacktest = {
   ok: true
-  /** The engine's version, e.g. "2.1.0". */
+  /** The engine’s version, e.g. "2.2.0". */
   engine: string
   strategy: string
   market: { symbol: string; interval: string }
@@ -101,12 +139,20 @@ export type DeviceBacktest = {
   stillOpen: number
   equityCurve: EquityPoint[]
   trades: DeviceTrade[]
-  monteCarlo: MonteCarloResult | null
-  /** Why no Monte Carlo ran although one was asked for (no closed trade). */
-  monteCarloSkipped: string | null
+  /** The real history scored as the scenarios are, for ranking it among them. */
+  realScenario: ScenarioResult
+  /** The 51 times of every scenario's `points`. */
+  pointTimes: Iso[]
+  /** The candles the price-paths chart draws (at most 300), and the real closes at them. */
+  priceTimes: Iso[]
+  prices: number[]
   computedMs: number
 }
 
 export type EngineFailure = { ok: false; engine: string; error: { message: string } }
 
 export type EngineAnswer = DeviceBacktest | EngineFailure
+
+export type SimulateAnswer = DeviceScenarios | EngineFailure
+
+export type SummaryAnswer = DeviceSummary | EngineFailure

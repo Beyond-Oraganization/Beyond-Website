@@ -101,7 +101,7 @@ test('adds a market: the busy state, a cancel, and Resume', async ({ page }) => 
   await expect(shown(page.getByRole('link', { name: 'EURPLN 1h', exact: true }))).toBeVisible()
 })
 
-test('backtests on this device with the bot’s engine: the balance, the trade returns, the Monte Carlo, and the run kept', async ({ page }) => {
+test('backtests on this device with the bot’s engine: the balance, the trade returns, a Monte Carlo by each method, and the runs kept', async ({ page }) => {
   await connected(page)
   await page.goto('#/backtest')
   await page.getByRole('button', { name: 'Run the backtest' }).click()
@@ -110,14 +110,25 @@ test('backtests on this device with the bot’s engine: the balance, the trade r
   await expect(page.getByText('Profit / loss').first()).toBeVisible()
   await expect(page.getByRole('img', { name: /^Balance from/ })).toBeVisible()
   await expect(page.getByRole('img', { name: /^Returns of \d+ trades/ })).toBeVisible()
-  await expect(page.getByRole('img', { name: /^1,000 simulated balance paths/ })).toBeVisible()
-  await expect(page.getByText(/of 1,000 paths ended above the starting balance/)).toBeVisible()
+  // 200 alternative price histories by bootstrap, backtested in several workers.
+  await expect(page.getByRole('img', { name: /^The balance over time in 200 alternative price histories/ })).toBeVisible()
+  await expect(page.getByText(/of 200 alternative pasts ended above the starting balance/)).toBeVisible()
+  await expect(page.getByText(/^The real history beat \d+% of them\.$/)).toBeVisible()
+  await expect(page.getByRole('img', { name: /^The real price from .* and 20 alternative histories/ })).toBeVisible()
   await expect(page.getByText('All figures')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Saved runs' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Show' }).first()).toBeVisible()
-  // A second run asks the bot only for the candles from the newest one on.
+  // A second run, by Brownian motion, asks the bot only for the candles from the newest one on.
+  await page.getByRole('radio', { name: '100 scenarios' }).check()
+  await page.getByRole('radio', { name: 'Brownian motion (random walk)' }).check()
   await page.getByRole('button', { name: 'Run the backtest' }).click()
-  await expect(page.getByRole('button', { name: 'Show' }).nth(1)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: 'Show' }).nth(1)).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByText(/of 100 alternative pasts ended above the starting balance/)).toBeVisible()
+  await expect(page.getByText(/Made by Brownian motion: a random walk with the real drift/)).toBeVisible()
+  // A table on a computer, a list of cards on a phone.
+  const savedRuns = page.getByRole('table', { name: 'Saved backtests' }).or(page.getByRole('list', { name: 'Saved backtests' }))
+  await expect(savedRuns.getByText(/\d% · Brownian motion/)).toBeVisible()
+  await expect(savedRuns.getByText(/\d% · bootstrap/)).toBeVisible()
   // The copy shows in Settings, where it can be cleared.
   await page.goto('#/settings')
   const copies = page.getByRole('heading', { name: 'Candles for backtests' }).locator('..')

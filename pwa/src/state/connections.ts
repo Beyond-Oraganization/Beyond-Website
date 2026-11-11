@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
+import { clearRuns } from '../backtest/saved.ts'
 import { db } from './db.ts'
 import { seal, unseal, type Sealed } from './vault.ts'
 
@@ -121,7 +122,7 @@ export const useConnections = create<ConnectionState>((set, get) => {
       await db.delPrefixed(`cache:${id}:`)
       await db.del(`ticks:${id}`)
       await db.del(`activity:${id}`)
-      await db.del(`backtests:${id}`)
+      await clearRuns(id)
     },
 
     async setToken(id, token) {

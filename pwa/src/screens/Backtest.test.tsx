@@ -8,10 +8,11 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { createBot, type MockBot } from '../../mock-bot/bot.mjs'
 import { queryClient } from '../api/bot.ts'
 import type { CommandResult } from '../api/types.ts'
-import { deviceAnswer } from '../backtest/fixtures.ts'
+import { deviceAnswer, scenariosAnswer, summaryAnswer } from '../backtest/fixtures.ts'
 import { EngineContext } from '../engine/context.ts'
 import type { Engine } from '../engine/engine.ts'
-import type { CandleColumns, EngineAnswer, EngineRequest } from '../engine/types.ts'
+import type { CandleColumns, EngineAnswer, EngineRequest, SummaryRequest } from '../engine/types.ts'
+import { db } from '../state/db.ts'
 import { useConnections } from '../state/connections.ts'
 import { useSettings } from '../state/settings.ts'
 import Backtest from './Backtest.tsx'
@@ -20,7 +21,7 @@ import Backtest from './Backtest.tsx'
 vi.mock('../components/Chart.tsx', () => ({ Chart: ({ label }: { label: string }) => <div role="img" aria-label={label} /> }))
 
 /**
- * The Backtest screen against the mock bot (which answers `candles export` and `kelly` as bot 2.1.0 does) and a fake
+ * The Backtest screen against the mock bot (which answers `candles export` and `kelly` as the bot does) and a fake
  * engine that records what it was asked: the real engine is the bot's own code, tested there, and end to end.
  */
 const BOT_URL = 'https://bot.test:8443'
@@ -29,10 +30,12 @@ const KEY = 'k'.repeat(40)
 let bot: MockBot
 let overrides: [prefix: string, respond: () => Response][] = []
 let asked: { request: EngineRequest; candles: CandleColumns }[] = []
+let simulated: { request: EngineRequest; count: number }[] = []
+let summed: SummaryRequest[] = []
 let engineAnswer: EngineAnswer = deviceAnswer()
 
 const server = setupServer(
-  http.get('*/engine/version.json', () => HttpResponse.json({ version: '2.1.0', commit: 'test' })),
+  http.get('*/engine/version.json', () => HttpResponse.json({ version: '2.2.0', commit: 'test' })),
   http.post(`${BOT_URL}/`, async ({ request }) => {
     const { args } = (await request.json()) as { args: string[] }
     const line = args.join(' ')
@@ -50,6 +53,15 @@ const engine: Engine = {
   async backtest(request, candles) {
     asked.push({ request, candles })
     return engineAnswer
+  },
+  async simulate(request, _candles, count, { onProgress } = {}) {
+    simulated.push({ request, count })
+    onProgress?.(count, count)
+    return scenariosAnswer({ method: request.scenarios!.method, seed: request.scenarios!.seed })
+  },
+  async summarize(request) {
+    summed.push(request)
+    return summaryAnswer()
   },
 }
 
@@ -78,6 +90,8 @@ beforeAll(() => server.listen())
 beforeEach(() => {
   bot = createBot({ ticking: false, seed: 3 })
   asked = []
+  simulated = []
+  summed = []
   engineAnswer = deviceAnswer()
   useSettings.setState({ openPanels: {} })
 })
@@ -90,15 +104,40 @@ afterEach(() => {
 afterAll(() => server.close())
 
 describe('Backtest', () => {
-  it('copies the bot’s candles to this device and backtests them here, with a thousand Monte Carlo paths', async () => {
+  it('copies the bot’s candles to this device and backtests them here, then on 200 alternative price histories by bootstrap', async () => {
     show()
     await run()
 
     expect(await screen.findByRole('heading', { name: 'Monte Carlo' })).toBeInTheDocument()
     const { request, candles } = asked[0]!
-    expect(request).toMatchObject({ strategy: 'drcs', symbol: 'XAUUSD', interval: '1h', kelly: null, monteCarlo: { paths: 1000 } })
+    expect(request).toMatchObject({ strategy: 'drcs', symbol: 'XAUUSD', interval: '1h', kelly: null })
     expect(candles.time.length).toBeGreaterThan(1000)
     expect(candles.close.length).toBe(candles.time.length)
+    expect(simulated[0]).toMatchObject({ count: 200, request: { ...request, scenarios: { method: 'Bootstrap', seed: expect.any(Number) } } })
+    expect(summed[0]).toMatchObject({ initialBalance: 1000, real: deviceAnswer().realScenario, results: scenariosAnswer().results })
+  })
+
+  it('makes the alternative histories by Brownian motion when chosen', async () => {
+    show()
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('radio', { name: 'Brownian motion (random walk)' }))
+    await user.click(screen.getByRole('button', { name: 'Run the backtest' }))
+
+    await screen.findByRole('heading', { name: 'Monte Carlo' })
+    expect(simulated[0]?.request.scenarios?.method).toBe('BrownianMotion')
+    expect(screen.getByText(/Brownian motion is calmer than any real market/)).toBeInTheDocument()
+  })
+
+  it('runs no Monte Carlo when it is off', async () => {
+    show()
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('radio', { name: 'Off' }))
+    await user.click(screen.getByRole('button', { name: 'Run the backtest' }))
+
+    expect(await screen.findByRole('table', { name: 'Saved backtests' })).toBeInTheDocument()
+    expect(simulated).toEqual([])
+    expect(screen.queryByRole('heading', { name: 'Monte Carlo' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('radiogroup', { name: 'Alternative histories by' })).not.toBeInTheDocument()
   })
 
   it('heads the report with four figures and keeps the others in a table that starts closed', async () => {
@@ -109,23 +148,39 @@ describe('Backtest', () => {
     expect(screen.getByText('All figures').closest('details')).not.toHaveAttribute('open')
   })
 
-  it('says how many paths ended above the starting balance, under the chart', async () => {
+  it('says how many alternative pasts ended above the starting balance, and where the real history ranks, under the chart', async () => {
     show()
     await run()
 
     const section = (await screen.findByRole('heading', { name: 'Monte Carlo' })).closest('section') as HTMLElement
     expect(within(section).getByText('66.7%')).toBeInTheDocument()
-    expect(within(section).getByText(/of 3 paths ended above the starting balance/)).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: /3 simulated balance paths of 2 trades/ })).toBeInTheDocument()
+    expect(within(section).getByText(/of 3 alternative pasts ended above the starting balance/)).toBeInTheDocument()
+    expect(within(section).getByText('The real history beat 67% of them.')).toBeInTheDocument()
+    expect(within(section).getByText(/blocks of about 5 candles/)).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /The balance over time in 3 alternative price histories/ })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /The real price from 2,000.* and 3 alternative histories/ })).toBeInTheDocument()
     expect(screen.getByRole('img', { name: /Returns of 2 trades: 1 lost, 1 won/ })).toBeInTheDocument()
   })
 
-  it('keeps the run on this device, with where its paths ended', async () => {
+  it('keeps the run on this device, with where its scenarios ended and how they were made', async () => {
     show()
     await run()
 
     const saved = (await screen.findByRole('table', { name: 'Saved backtests' })) as HTMLElement
-    expect(within(saved).getByText('66.7%')).toBeInTheDocument()
+    expect(within(saved).getByText('66.7% · bootstrap')).toBeInTheDocument()
+  })
+
+  it('shows a run saved before 2.2.0 with what its Monte Carlo of trades found', async () => {
+    const before = { kind: 'device', id: 'old', at: 1, input: { strategy: 'drcs', symbol: 'XAUUSD', interval: '1h', params: {} }, balance: 1000, from: null, to: null, paths: 1000,
+      result: { ...deviceAnswer(), tradeReturns: [0.02], overlappingTrades: 0, curve: [], monteCarlo: { paths: 1000, endedAboveStartPercent: 61.2 } } }
+    await db.set(`backtests:backtest-${n + 1}`, [before])
+    show()
+    const user = userEvent.setup()
+
+    const saved = (await screen.findByRole('table', { name: 'Saved backtests' })) as HTMLElement
+    expect(within(saved).getByText('61.2% · trade resampling')).toBeInTheDocument()
+    await user.click(within(saved).getByRole('button', { name: 'Show' }))
+    expect(await screen.findByText(/resampled its trades: 61.2% of 1,000 paths ended above the start/)).toBeInTheDocument()
   })
 
   it('with Kelly sizing, sizes by the Kelly the bot would trade with', async () => {
@@ -142,7 +197,7 @@ describe('Backtest', () => {
   })
 
   it('shows the engine’s message for a request it refuses', async () => {
-    engineAnswer = { ok: false, engine: '2.1.0', error: { message: "drcs has no parameter speed. Parameters: depth, deviation, moving-count." } }
+    engineAnswer = { ok: false, engine: '2.2.0', error: { message: "drcs has no parameter speed. Parameters: depth, deviation, moving-count." } }
     show()
     await run()
 

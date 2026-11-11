@@ -1,0 +1,36 @@
+{
+  "name": "beyond-bot-desktop",
+  "productName": "Beyond Bot",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Beyond Bot in its own window, with a SQLite database on the computer for its backtests, Monte Carlo scenarios and candle copies.",
+  "type": "module",
+  "main": "src/main.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.js",
+    "test:e2e": "playwright test",
+    "dist": "electron-builder --mac zip --publish never"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "io.github.beyond-oraganization.beyond-bot",
+    "productName": "Beyond Bot",
+    "files": ["src/**/*", "package.json"],
+    "mac": {
+      "category": "public.app-category.finance",
+      "identity": null,
+      "target": ["zip"]
+    },
+    "directories": {
+      "output": "dist"
+    }
+  }
+}
