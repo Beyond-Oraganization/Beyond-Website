@@ -124,11 +124,6 @@ def copy_real_site(destination: Path) -> Path:
         if item.is_file() and item.suffix in COPIED_SUFFIXES:
             shutil.copy2(item, destination / item.name)
     shutil.copytree(SITE_DIR / "fonts", destination / "fonts", dirs_exist_ok=True)
-    # techbot.html links to the Beyond Bot app (app/, built from pwa/); its page is all the link checks need.
-    app_page = SITE_DIR / "app" / "index.html"
-    if app_page.is_file():
-        (destination / "app").mkdir(exist_ok=True)
-        shutil.copy2(app_page, destination / "app" / "index.html")
     return destination
 
 

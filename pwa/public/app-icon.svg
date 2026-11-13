@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Beyond Bot: a candlestick with an eye in its body">
-  <rect width="512" height="512" rx="100" fill="#003049"/>
-  <g transform="translate(256 256) scale(2.1333) translate(-120 -120)">
-    <path d="M120 56V84M120 156V184" fill="none" stroke="#FCBF49" stroke-width="10" stroke-linecap="round"/>
-    <rect x="82" y="84" width="76" height="72" rx="12" fill="#FCBF49"/>
-    <path d="M93 120Q120 96 147 120Q120 144 93 120Z" fill="none" stroke="#003049" stroke-width="5" stroke-linejoin="round"/>
-    <circle cx="120" cy="120" r="8" fill="#003049"/>
-  </g>
-</svg>
